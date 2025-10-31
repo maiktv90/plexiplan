@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxMSNd8TaiO25kw0cBjm5//JyFHxP1ckcw6dv/5Yo44Arxr1O4CvG8Cl1Hg/5FFvc1cn2Z2vMOtY02KcdSAlByzMVziWJRPLrc+a+eOSNb9NQQTvT/ZkQpd6uSNYAurmDPaDzc6nlZaCWTcLxScZGAcCTbJi+eoxwKIeGUXRcYQBDQvk7pqYucKXbJGGT6tE/USzFanxXCp1rgKhITub11MYiRswUB8RGJS1QtGXfvIh8PRW/ndgINuQL4jEONqafl+zyy6FNTZ79pNdWYbU3E6ltu+qXJo7WwtWIjW6aFbbciud6CHEAEx8AX7SUl8qOqhQkUPwp7c2L/QoxSuzH3wIDAQAB",
+  "name": "Plexify Planner",
+  "version": "2.0.0",
+  "description": "Modern productivity planner with task management, time tracking, and pull request monitoring",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Plexify Planner"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "identity",
+    "cookies",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:8080/*",
+    "http://localhost:7777/*",
+    "http://localhost:8081/*"
+  ],
+  
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
