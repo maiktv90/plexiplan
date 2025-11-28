@@ -1,18 +1,20 @@
 // Clean Architecture - Task Hooks with Service Layer
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  TaskService, 
-  type TaskParams, 
-  type CreateTaskParams, 
-  type UpdateTaskParams 
-} from '../services/TaskService';
+import {
+  TaskService,
+  type TaskParams,
+  type CreateTaskParams,
+  type UpdateTaskParams
+} from '@/api';
 
 export const useTaskListQuery = (enabled = true) => {
   return useQuery({
     queryKey: ['tasks', 'list'],
     queryFn: async () => {
       const response = await TaskService.getTaskList();
+      console.log('TaskService.getTaskList response:', response);
       if (response.success) {
+        console.log('TaskService.getTaskList data:', response.data);
         return response.data;
       }
       throw new Error(response.error || 'Failed to fetch task list');
@@ -81,8 +83,8 @@ export const useCreateTaskMutation = () => {
     onSuccess: (_, variables) => {
       // Invalidate task list and specific client tasks
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
-      queryClient.invalidateQueries({ 
-        queryKey: ['tasks', 'detail', variables.clientRegistrationId] 
+      queryClient.invalidateQueries({
+        queryKey: ['tasks', 'detail', variables.clientRegistrationId]
       });
     },
   });
@@ -105,11 +107,11 @@ export const useUpdateTaskMutation = () => {
         ['tasks', 'detail', variables.clientRegistrationId, variables.taskId],
         data
       );
-      
+
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
-      queryClient.invalidateQueries({ 
-        queryKey: ['tasks', 'details', variables.clientRegistrationId, variables.taskId] 
+      queryClient.invalidateQueries({
+        queryKey: ['tasks', 'details', variables.clientRegistrationId, variables.taskId]
       });
     },
   });
@@ -128,11 +130,11 @@ export const useDeleteTaskMutation = () => {
     },
     onSuccess: (_, variables) => {
       // Remove from cache and invalidate lists
-      queryClient.removeQueries({ 
-        queryKey: ['tasks', 'detail', variables.clientRegistrationId, variables.taskId] 
+      queryClient.removeQueries({
+        queryKey: ['tasks', 'detail', variables.clientRegistrationId, variables.taskId]
       });
-      queryClient.removeQueries({ 
-        queryKey: ['tasks', 'details', variables.clientRegistrationId, variables.taskId] 
+      queryClient.removeQueries({
+        queryKey: ['tasks', 'details', variables.clientRegistrationId, variables.taskId]
       });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
     },

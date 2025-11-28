@@ -17,7 +17,7 @@ export const Input: React.FC<InputProps> = ({
   className = '',
   ...props
 }) => {
-  const baseClasses = 'border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors';
+  const baseClasses = 'border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors';
   
   const widthClass = fullWidth ? 'w-full' : '';
   const iconPadding = icon ? 'pl-10' : 'px-3';

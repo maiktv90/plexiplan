@@ -1,7 +1,7 @@
 // Clean Architecture - Auth Hooks with Service Layer
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AuthService, type LoginCredentials, type RegisterCredentials } from '../services/AuthService';
-import { useAuthStore } from '@/store';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const authService = AuthService;
 
@@ -11,7 +11,7 @@ export const useAuthQuery = () => {
     queryFn: async () => {
       const response = await authService.getCurrentUser();
       if (response.success) {
-          return response.data;
+        return response.data;
       }
       throw new Error(response.error || 'Failed to get current user');
     },
@@ -28,7 +28,7 @@ export const useLoginMutation = () => {
     mutationFn: async (credentials: LoginCredentials) => {
       setLoading(true);
       const response = await authService.login(credentials);
-      console.log({response})
+      console.log({ response })
       if (response.success) {
         return response.data;
       }
@@ -54,7 +54,7 @@ export const useRegisterMutation = () => {
     mutationFn: async (credentials: RegisterCredentials) => {
       setLoading(true);
       const response = await authService.register(credentials);
-      
+
       if (response.success) {
         return response.data;
       }

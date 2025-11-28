@@ -1,6 +1,6 @@
 // Clean Architecture - Task Service Layer
-import { taskApiClient }       from '@/api';
-import type { Task, TaskList } from '@/utils/types/pm.types';
+import { taskApiClient } from '../client/instances';
+import type { Task, TaskOverviewResponse } from '@/utils/types/pm.types';
 
 export interface TaskParams {
   taskId: string;
@@ -23,7 +23,7 @@ export interface UpdateTaskParams extends TaskParams {
 
 export class TaskService {
   static async getTaskList() {
-    return await taskApiClient.get<TaskList[]>('/');
+    return await taskApiClient.get<TaskOverviewResponse>('/overview');
   }
 
   static async getTask(params: TaskParams) {

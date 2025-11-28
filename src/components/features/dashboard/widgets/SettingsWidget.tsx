@@ -1,6 +1,6 @@
 // Clean Architecture - Settings Widget Feature Component
 import React from 'react';
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/stores/useUIStore';
 import { useLogoutMutation } from '@/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -36,11 +36,10 @@ export const SettingsWidget: React.FC = () => {
               <button
                 key={themeOption}
                 onClick={() => handleThemeChange(themeOption)}
-                className={`px-3 py-2 text-xs rounded-md transition-colors ${
-                  theme === themeOption
-                    ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                className={`px-3 py-2 text-xs rounded-md transition-colors ${theme === themeOption
+                    ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-300 border border-primary-300 dark:border-primary-700'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 {themeOption.charAt(0).toUpperCase() + themeOption.slice(1)}
               </button>
@@ -66,9 +65,9 @@ export const SettingsWidget: React.FC = () => {
           <Button variant="outline" size="sm" className="w-full">
             Account Settings
           </Button>
-          <Button 
-            variant="destructive" 
-            size="sm" 
+          <Button
+            variant="destructive"
+            size="sm"
             className="w-full"
             onClick={handleLogout}
             loading={logoutMutation.isPending}

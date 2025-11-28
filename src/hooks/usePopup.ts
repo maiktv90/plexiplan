@@ -1,10 +1,14 @@
-import { useContext } from 'react';
-import { PopupContext } from '../context/popupContextDef';
+import { useUIStore } from '@/stores/useUIStore';
 
 export const usePopup = () => {
-  const context = useContext(PopupContext);
-  if (!context) {
-    throw new Error('usePopup must be used within a PopupProvider');
-  }
-  return context;
+  const { isPopup, setIsPopup, isLoading, hasError, setError, setLoading } = useUIStore();
+
+  return {
+    isPopup,
+    isLoading,
+    hasError,
+    setIsPopup,
+    setLoading,
+    setHasError: setError,
+  };
 };

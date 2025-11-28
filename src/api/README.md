@@ -34,6 +34,6 @@ The auth API is integrated with the React hooks in `src/hooks/useAuth.ts` and pr
 The auth API uses the same KeyCloak configuration as defined in `src/config/auth.config.ts`:
 
 - Client Registration ID: `baseuser`
-- Auth endpoints configured for localhost:8080
+- Auth endpoints configured for localhost:7777
 - CSRF token support
 - Extension and web app compatibility

@@ -24,13 +24,28 @@ export default defineConfig({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    global: 'globalThis',
   },
   server: {
     proxy: {
       '/planner': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+      '/config': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+      // Proxy /auth to backend, but bypass for OAuth callbacks that need SPA handling
+      '/auth': {
         target: 'http://localhost:7777',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/planner/, ''),
+        bypass: (req) => {
+          // Don't proxy Trello callback - let SPA handle it
+          if (req.url?.startsWith('/auth/trello/callback')) {
+            return '/index.html';
+          }
+        },
       },
     },
   },

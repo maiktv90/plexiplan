@@ -49,8 +49,8 @@ export interface TokenStorage {
   expiresAt: number;
 }
 
-// Token storage utilities for extension
-const TOKEN_STORAGE_KEY = 'plexify_auth_tokens';
+// Token storage utilities for extension - use same key as AuthService
+const TOKEN_STORAGE_KEY = 'auth_tokens';
 
 export const storeTokens = async (authResponse: AuthResponse): Promise<void> => {
   const tokenData: TokenStorage = {
@@ -61,9 +61,13 @@ export const storeTokens = async (authResponse: AuthResponse): Promise<void> => 
   };
 
   if (isExtensionContext()) {
-    await chrome.storage.local.set({ [TOKEN_STORAGE_KEY]: tokenData });
+    await chrome.storage.local.set({ 
+      [TOKEN_STORAGE_KEY]: tokenData,
+      'auth_token': authResponse.token // Legacy compatibility
+    });
   } else {
     localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokenData));
+    localStorage.setItem('auth_token', authResponse.token); // Legacy compatibility
   }
 };
 
@@ -84,9 +88,11 @@ export const getStoredTokens = async (): Promise<TokenStorage | null> => {
 
 export const clearStoredTokens = async (): Promise<void> => {
   if (isExtensionContext()) {
-    await chrome.storage.local.remove([TOKEN_STORAGE_KEY]);
+    await chrome.storage.local.remove([TOKEN_STORAGE_KEY, 'auth_token']);
   } else {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_token');
   }
 };
 
@@ -97,8 +103,9 @@ export const isTokenValid = (tokenData: TokenStorage): boolean => {
 // New JWT-based authentication functions
 export const loginWithCredentials = async (email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
   try {
-    // Use fetch instead of axios for Chrome extension to bypass CORS
-    const response = await fetch(`${authUrl}/login`, {
+    // Use relative URL to work with Vite proxy in development
+    const loginEndpoint = isExtensionContext() ? `${authUrl}/login` : '/auth/login';
+    const response = await fetch(loginEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

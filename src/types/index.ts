@@ -64,3 +64,9 @@ export interface AppState {
   isExpanded: boolean;
   currentView: 'dashboard' | 'tasks' | 'pull-requests' | 'time-tracking' | 'settings';
 }
+
+// Re-export booking types
+export * from './booking.types';
+
+// Re-export tool types
+export * from './tool.types';
