@@ -1,11 +1,10 @@
 /**
- * GitHub Tool Provider
+ * Bitbucket Tool Provider
  *
- * Implements IToolProvider for GitHub integration.
- * Maps GitHub's API responses to unified task/board interfaces.
+ * Implements IToolProvider for Bitbucket integration.
+ * Maps Bitbucket's API responses to unified task/board interfaces.
  *
- * Note: The backend focuses on repositories, branches, and pull requests
- * rather than GitHub Issues. PRs are mapped as tasks for code review workflows.
+ * Similar to GitHub, focuses on repositories and pull requests.
  */
 
 import type {
@@ -16,14 +15,13 @@ import type {
   UnifiedPullRequest,
 } from '../ToolProvider.interface';
 import type { UnifiedTask, UnifiedBoard, TaskFilter, TaskStatus } from '@/types/task.types';
-import { GitHubService, type GitHubRepo, type GitHubPullRequest } from './GitHubService';
+import { BitbucketService, type BitbucketRepo, type BitbucketPullRequest } from './BitbucketService';
 
 /**
- * GitHub-specific capabilities
- * Note: canFetchTasks is false - PRs are not "tasks" in the project management sense.
- * PRs are fetched via canFetchPullRequests and shown on the dedicated PR widget.
+ * Bitbucket-specific capabilities
+ * Similar to GitHub - PRs are fetched via dedicated method, not as tasks
  */
-const GITHUB_CAPABILITIES: ToolCapabilities = {
+const BITBUCKET_CAPABILITIES: ToolCapabilities = {
   canFetchTasks: false, // PRs are NOT tasks - they have their own widget
   canFetchBoards: true, // Repos as boards
   canFetchPullRequests: true, // PRs are fetched via dedicated method
@@ -38,79 +36,95 @@ const GITHUB_CAPABILITIES: ToolCapabilities = {
 };
 
 /**
- * Maps GitHub PR to unified task
+ * Maps Bitbucket PR state to unified PR status
+ */
+function mapBitbucketState(state: BitbucketPullRequest['state']): UnifiedPullRequest['status'] {
+  switch (state) {
+    case 'OPEN':
+      return 'open';
+    case 'MERGED':
+      return 'merged';
+    case 'DECLINED':
+    case 'SUPERSEDED':
+      return 'closed';
+    default:
+      return 'open';
+  }
+}
+
+/**
+ * Maps Bitbucket PR to unified task
  * PRs are treated as code review tasks
  */
-function mapGitHubPRToTask(pr: GitHubPullRequest): UnifiedTask {
-  // PRs are always in progress until merged/closed
+function mapBitbucketPRToTask(pr: BitbucketPullRequest): UnifiedTask {
   const status: TaskStatus = 'in_progress';
-
-  // Create a unique ID combining owner, repo, and branch
-  const uniqueId = `${pr.owner}-${pr.repo}-${pr.branchName}`.replace(/[^a-zA-Z0-9-]/g, '-');
+  const uniqueId = `${pr.workspace}-${pr.repo}-${pr.id}`;
 
   return {
-    id: `github-${uniqueId}`,
-    source: 'github',
-    sourceId: uniqueId,
+    id: `bitbucket-${uniqueId}`,
+    source: 'bitbucket',
+    sourceId: String(pr.id),
     title: pr.title || `PR: ${pr.branchName}`,
-    description: `Pull request on ${pr.owner}/${pr.repo}`,
+    description: `Pull request on ${pr.workspace}/${pr.repo}`,
     status,
     url: pr.url,
 
     // Organization - use repo as board
-    boardId: `${pr.owner}/${pr.repo}`,
-    boardName: `${pr.owner}/${pr.repo}`,
+    boardId: `${pr.workspace}/${pr.repo}`,
+    boardName: `${pr.workspace}/${pr.repo}`,
     listId: 'pull-requests',
     listName: 'Pull Requests',
+
+    createdAt: pr.createdOn,
+    updatedAt: pr.updatedOn,
   };
 }
 
 /**
- * Maps GitHub PR to unified pull request
+ * Maps Bitbucket PR to unified pull request
  */
-function mapGitHubPRToUnifiedPR(pr: GitHubPullRequest): UnifiedPullRequest {
-  const uniqueId = `${pr.owner}-${pr.repo}-${pr.branchName}`.replace(/[^a-zA-Z0-9-]/g, '-');
+function mapBitbucketPRToUnifiedPR(pr: BitbucketPullRequest): UnifiedPullRequest {
+  const uniqueId = `${pr.workspace}-${pr.repo}-${pr.id}`;
 
   return {
-    id: `github-${uniqueId}`,
-    source: 'github',
+    id: `bitbucket-${uniqueId}`,
+    source: 'bitbucket',
     title: pr.title || `PR: ${pr.branchName}`,
     branchName: pr.branchName,
     repository: pr.repo,
-    owner: pr.owner,
+    owner: pr.workspace,
     url: pr.url,
-    status: 'open', // Backend doesn't provide status, assume open
-    createdAt: pr.createdAt,
-    updatedAt: pr.updatedAt,
+    status: mapBitbucketState(pr.state),
+    createdAt: pr.createdOn,
+    updatedAt: pr.updatedOn,
+    isAuthor: pr.isAuthor,
   };
 }
 
 /**
- * Maps GitHub repository to unified board
+ * Maps Bitbucket repository to unified board
  */
-function mapGitHubRepoToBoard(repo: GitHubRepo): UnifiedBoard {
-  const fullName = repo.org ? `${repo.org}/${repo.name}` : repo.name;
-
+function mapBitbucketRepoToBoard(repo: BitbucketRepo): UnifiedBoard {
   return {
-    id: `github-${repo.id}`,
-    source: 'github',
-    sourceId: repo.id,
-    name: fullName,
-    description: repo.archived ? '(Archived)' : undefined,
-    url: `https://github.com/${fullName}`,
+    id: `bitbucket-${repo.uuid}`,
+    source: 'bitbucket',
+    sourceId: repo.uuid,
+    name: repo.fullName,
+    description: repo.isPrivate ? '(Private)' : undefined,
+    url: `https://bitbucket.org/${repo.fullName}`,
   };
 }
 
 /**
- * GitHub Provider Implementation
+ * Bitbucket Provider Implementation
  */
-export class GitHubProvider implements IToolProvider {
+export class BitbucketProvider implements IToolProvider {
   readonly meta: ToolProviderMeta = {
-    id: 'github',
-    name: 'GitHub',
-    icon: 'github',
-    description: 'GitHub repositories and pull requests',
-    capabilities: GITHUB_CAPABILITIES,
+    id: 'bitbucket',
+    name: 'Bitbucket',
+    icon: 'bitbucket',
+    description: 'Bitbucket repositories and pull requests',
+    capabilities: BITBUCKET_CAPABILITIES,
   };
 
   private connectionStatus: boolean | null = null;
@@ -123,7 +137,7 @@ export class GitHubProvider implements IToolProvider {
 
     try {
       // Try to fetch repos - if it works, we're connected
-      const result = await GitHubService.getRepos();
+      const result = await BitbucketService.getRepos();
       this.connectionStatus = result.success;
       return this.connectionStatus;
     } catch {
@@ -141,43 +155,40 @@ export class GitHubProvider implements IToolProvider {
 
   async getBoards(): Promise<ProviderResult<UnifiedBoard[]>> {
     try {
-      const result = await GitHubService.getRepos();
+      const result = await BitbucketService.getRepos();
 
       if (!result.success || !result.data) {
         return {
           data: null,
-          error: result.error || 'Failed to fetch GitHub repositories',
-          source: 'github',
+          error: result.error || 'Failed to fetch Bitbucket repositories',
+          source: 'bitbucket',
         };
       }
 
-      // Filter out archived repos by default
-      const activeRepos = result.data.filter((repo) => !repo.archived);
-      const boards = activeRepos.map(mapGitHubRepoToBoard);
-
-      return { data: boards, error: null, source: 'github' };
+      const boards = result.data.map(mapBitbucketRepoToBoard);
+      return { data: boards, error: null, source: 'bitbucket' };
     } catch (error) {
       return {
         data: null,
         error: error instanceof Error ? error.message : 'Unknown error',
-        source: 'github',
+        source: 'bitbucket',
       };
     }
   }
 
   async getTasks(filter?: TaskFilter): Promise<ProviderResult<UnifiedTask[]>> {
     try {
-      const result = await GitHubService.getPullRequests();
+      const result = await BitbucketService.getPullRequests();
 
       if (!result.success || !result.data) {
         return {
           data: null,
-          error: result.error || 'Failed to fetch GitHub pull requests',
-          source: 'github',
+          error: result.error || 'Failed to fetch Bitbucket pull requests',
+          source: 'bitbucket',
         };
       }
 
-      let tasks = result.data.map(mapGitHubPRToTask);
+      let tasks = result.data.map(mapBitbucketPRToTask);
 
       // Apply filter if provided
       if (filter) {
@@ -198,26 +209,25 @@ export class GitHubProvider implements IToolProvider {
         }
       }
 
-      return { data: tasks, error: null, source: 'github' };
+      return { data: tasks, error: null, source: 'bitbucket' };
     } catch (error) {
       return {
         data: null,
         error: error instanceof Error ? error.message : 'Unknown error',
-        source: 'github',
+        source: 'bitbucket',
       };
     }
   }
 
   async getTask(taskId: string): Promise<ProviderResult<UnifiedTask>> {
     try {
-      // Since we don't have a single PR endpoint, fetch all and find
       const result = await this.getTasks();
 
       if (!result.data) {
         return {
           data: null,
-          error: result.error || 'Failed to fetch GitHub tasks',
-          source: 'github',
+          error: result.error || 'Failed to fetch Bitbucket tasks',
+          source: 'bitbucket',
         };
       }
 
@@ -227,48 +237,47 @@ export class GitHubProvider implements IToolProvider {
         return {
           data: null,
           error: `Task ${taskId} not found`,
-          source: 'github',
+          source: 'bitbucket',
         };
       }
 
-      return { data: task, error: null, source: 'github' };
+      return { data: task, error: null, source: 'bitbucket' };
     } catch (error) {
       return {
         data: null,
         error: error instanceof Error ? error.message : 'Unknown error',
-        source: 'github',
+        source: 'bitbucket',
       };
     }
   }
 
   async getTasksForBoard(boardId: string): Promise<ProviderResult<UnifiedTask[]>> {
-    // Filter PRs by repository
     return this.getTasks({ boardId });
   }
 
   async getPullRequests(): Promise<ProviderResult<UnifiedPullRequest[]>> {
     try {
-      const result = await GitHubService.getPullRequests();
+      const result = await BitbucketService.getPullRequests();
 
       if (!result.success || !result.data) {
         return {
           data: null,
-          error: result.error || 'Failed to fetch GitHub pull requests',
-          source: 'github',
+          error: result.error || 'Failed to fetch Bitbucket pull requests',
+          source: 'bitbucket',
         };
       }
 
-      const pullRequests = result.data.map(mapGitHubPRToUnifiedPR);
-      return { data: pullRequests, error: null, source: 'github' };
+      const pullRequests = result.data.map(mapBitbucketPRToUnifiedPR);
+      return { data: pullRequests, error: null, source: 'bitbucket' };
     } catch (error) {
       return {
         data: null,
         error: error instanceof Error ? error.message : 'Unknown error',
-        source: 'github',
+        source: 'bitbucket',
       };
     }
   }
 }
 
 // Export singleton instance
-export const githubProvider = new GitHubProvider();
+export const bitbucketProvider = new BitbucketProvider();

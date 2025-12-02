@@ -47,10 +47,20 @@ export type { TrelloBoard, TrelloCard, TrelloLabel } from './trello';
 export { GitHubProvider, githubProvider, GitHubService } from './github';
 export type { GitHubRepo, GitHubPullRequest, GitHubBranch } from './github';
 
+// Bitbucket Provider
+export { BitbucketProvider, bitbucketProvider, BitbucketService } from './bitbucket';
+export type { BitbucketRepo, BitbucketPullRequest } from './bitbucket';
+
+// Jira Provider
+export { JiraProvider, jiraProvider, JiraService } from './jira';
+export type { JiraProject, JiraIssue, JiraStatus, JiraPriority } from './jira';
+
 // Initialize all providers
 import { ToolProviderRegistry } from './ToolProviderRegistry';
 import { trelloProvider } from './trello';
 import { githubProvider } from './github';
+import { bitbucketProvider } from './bitbucket';
+import { jiraProvider } from './jira';
 
 /**
  * Initialize and register all tool providers
@@ -63,7 +73,9 @@ export function initializeToolProviders(): void {
   // Register GitHub
   ToolProviderRegistry.register(githubProvider);
 
-  // TODO: Register other providers as they're implemented
-  // ToolProviderRegistry.register(jiraProvider);
-  // ToolProviderRegistry.register(bitbucketProvider);
+  // Register Bitbucket
+  ToolProviderRegistry.register(bitbucketProvider);
+
+  // Register Jira
+  ToolProviderRegistry.register(jiraProvider);
 }

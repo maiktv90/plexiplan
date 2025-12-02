@@ -1,25 +1,38 @@
 import React, { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Settings } from 'lucide-react';
+import { Sun, Moon, Monitor } from 'lucide-react';
 import { SettingsSidebar, type SettingsSection } from '@/components/features/settings';
+import { useTheme } from '@/hooks/useTheme';
 import {
   ToolList,
   ToolConnectionDialog,
   ToolDisconnectDialog,
+  JiraProjectConfigDialog,
+  BitbucketRepoConfigDialog,
 } from '@/components/features/tools';
 import {
   useIntegrationsQuery,
   useRegisterPATMutation,
   useDisconnectToolMutation,
   useInitiateOAuthMutation,
+  useUpdateToolOrderMutation,
 } from '@/api/hooks/useTools';
 import { useToolStore } from '@/stores/useToolStore';
 import { useOAuthCallback } from '@/hooks/useOAuthCallback';
 import { ToolService } from '@/api/services/ToolService';
+import { JiraService } from '@/providers/tools/jira/JiraService';
+import { BitbucketService } from '@/providers/tools/bitbucket/BitbucketService';
 import type { ToolDefinition, ConnectedTool, PATCredentials } from '@/types/tool.types';
+import { jiraClientRegistrationId, jiraServerClientRegistrationId } from '@/config/jira.config';
+
+const BITBUCKET_CLIENT_REGISTRATION_ID = 'bitbucket';
 
 export const SettingsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('tools');
+  const { theme, setTheme } = useTheme();
+  const [isJiraConfigOpen, setIsJiraConfigOpen] = useState(false);
+  const [jiraSelectedProjectIds, setJiraSelectedProjectIds] = useState<string[]>([]);
+  const [isBitbucketConfigOpen, setIsBitbucketConfigOpen] = useState(false);
+  const [bitbucketSelectedRepoIds, setBitbucketSelectedRepoIds] = useState<string[]>([]);
 
   // API hooks
   const { data: integrations, isLoading, error, refetch } = useIntegrationsQuery();
@@ -35,6 +48,7 @@ export const SettingsPage: React.FC = () => {
   const registerPATMutation = useRegisterPATMutation();
   const disconnectMutation = useDisconnectToolMutation();
   const initiateOAuthMutation = useInitiateOAuthMutation();
+  const updateToolOrderMutation = useUpdateToolOrderMutation();
 
   // Store for dialog state
   const {
@@ -119,6 +133,67 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  // Handle opening tool settings
+  const handleSettings = async (tool: ToolDefinition) => {
+    // Check if it's a Jira tool (Cloud or Server)
+    if (tool.clientRegistrationId === jiraClientRegistrationId ||
+        tool.clientRegistrationId === jiraServerClientRegistrationId) {
+      // Fetch current configuration before opening dialog
+      try {
+        const result = await JiraService.getConfiguration();
+        if (result.success && result.data) {
+          setJiraSelectedProjectIds(result.data.selectedProjectIds);
+        } else {
+          setJiraSelectedProjectIds([]);
+        }
+      } catch {
+        setJiraSelectedProjectIds([]);
+      }
+      setIsJiraConfigOpen(true);
+    }
+    // Check if it's Bitbucket
+    else if (tool.clientRegistrationId === BITBUCKET_CLIENT_REGISTRATION_ID) {
+      // Fetch current configuration before opening dialog
+      try {
+        const result = await BitbucketService.getConfiguration();
+        if (result.success && result.data) {
+          setBitbucketSelectedRepoIds(result.data.selectedRepositoryIds);
+        } else {
+          setBitbucketSelectedRepoIds([]);
+        }
+      } catch {
+        setBitbucketSelectedRepoIds([]);
+      }
+      setIsBitbucketConfigOpen(true);
+    }
+  };
+
+  // Handle saving Jira configuration
+  const handleSaveJiraConfig = async (selectedProjectIds: string[]) => {
+    await JiraService.updateConfiguration({ selectedProjectIds });
+    setJiraSelectedProjectIds(selectedProjectIds);
+  };
+
+  // Handle saving Bitbucket configuration
+  const handleSaveBitbucketConfig = async (selectedRepositoryIds: string[]) => {
+    await BitbucketService.updateConfiguration({ selectedRepositoryIds });
+    setBitbucketSelectedRepoIds(selectedRepositoryIds);
+  };
+
+  // Handle tool reordering
+  const handleToolReorder = async (reorderedTools: ConnectedTool[]) => {
+    const toolOrders = reorderedTools.map((tool, index) => ({
+      clientKey: tool.clientKey,
+      order: index,
+    }));
+
+    try {
+      await updateToolOrderMutation.mutateAsync({ toolOrders });
+    } catch (err) {
+      console.error('Failed to update tool order:', err);
+    }
+  };
+
   // Render content based on active section
   const renderContent = () => {
     switch (activeSection) {
@@ -132,7 +207,9 @@ export const SettingsPage: React.FC = () => {
             loadingTools={toolLoadingStates}
             onConnect={handleConnect}
             onDisconnect={handleDisconnect}
+            onSettings={handleSettings}
             onRetry={() => refetch()}
+            onReorder={handleToolReorder}
           />
         );
       case 'account':
@@ -143,8 +220,62 @@ export const SettingsPage: React.FC = () => {
         );
       case 'preferences':
         return (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-            Preferences coming soon
+          <div className="space-y-6">
+            {/* Theme Settings */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Appearance
+              </h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Theme
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => setTheme('light')}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                      theme === 'light'
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <Sun className={`h-6 w-6 ${theme === 'light' ? 'text-primary-500' : 'text-gray-500 dark:text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${theme === 'light' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Light
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setTheme('dark')}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                      theme === 'dark'
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <Moon className={`h-6 w-6 ${theme === 'dark' ? 'text-primary-500' : 'text-gray-500 dark:text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${theme === 'dark' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Dark
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setTheme('system')}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                      theme === 'system'
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <Monitor className={`h-6 w-6 ${theme === 'system' ? 'text-primary-500' : 'text-gray-500 dark:text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${theme === 'system' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      System
+                    </span>
+                  </button>
+                </div>
+                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                  Choose how Plexify Planner looks to you. Select a single theme, or sync with your system settings.
+                </p>
+              </div>
+            </div>
           </div>
         );
       default:
@@ -154,32 +285,9 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link
-                to="/dashboard"
-                className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                <span className="hidden sm:inline">Back to Dashboard</span>
-              </Link>
-            </div>
-            <div className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Settings
-              </h1>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex gap-4 lg:gap-8">
           {/* Sidebar */}
           <SettingsSidebar
             activeSection={activeSection}
@@ -215,6 +323,20 @@ export const SettingsPage: React.FC = () => {
         isDisconnecting={
           disconnectingTool ? toolLoadingStates[disconnectingTool.clientKey] : false
         }
+      />
+
+      <JiraProjectConfigDialog
+        isOpen={isJiraConfigOpen}
+        onClose={() => setIsJiraConfigOpen(false)}
+        onSave={handleSaveJiraConfig}
+        initialSelectedIds={jiraSelectedProjectIds}
+      />
+
+      <BitbucketRepoConfigDialog
+        isOpen={isBitbucketConfigOpen}
+        onClose={() => setIsBitbucketConfigOpen(false)}
+        onSave={handleSaveBitbucketConfig}
+        initialSelectedIds={bitbucketSelectedRepoIds}
       />
     </div>
   );

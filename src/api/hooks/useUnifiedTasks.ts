@@ -47,7 +47,7 @@ export function useUnifiedTasksQuery(filter?: TaskFilter, enabled = true) {
       };
     },
     enabled,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes - extended for better performance
     retry: 1,
   });
 }
@@ -75,7 +75,7 @@ export function useActiveTasksQuery(enabled = true) {
       };
     },
     enabled,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - extended for better performance
     retry: 1,
   });
 }
@@ -161,7 +161,7 @@ export function useBoardTasksQuery(boardId: string | undefined, enabled = true) 
       return result.data || [];
     },
     enabled: enabled && !!boardId,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - extended for better performance
   });
 }
 
@@ -173,6 +173,7 @@ export function getTaskSourceIcon(source: TaskSource): string {
     trello: 'trello',
     jira: 'jira',
     github: 'github',
+    bitbucket: 'bitbucket',
     'azure-devops': 'azure',
   };
   return icons[source] || 'task';
@@ -186,6 +187,7 @@ export function getTaskSourceColor(source: TaskSource): string {
     trello: '#0079BF',
     jira: '#0052CC',
     github: '#24292F',
+    bitbucket: '#0052CC',
     'azure-devops': '#0078D4',
   };
   return colors[source] || '#6B7280';

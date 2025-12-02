@@ -21,8 +21,18 @@
 import type { TaskSource, UnifiedTask, UnifiedBoard, TaskFilter } from '@/types/task.types';
 import type { IToolProvider, ProviderResult, ToolProviderMeta, UnifiedPullRequest } from './ToolProvider.interface';
 
+/**
+ * Connection status cache entry
+ */
+interface ConnectionCacheEntry {
+  isConnected: boolean;
+  timestamp: number;
+}
+
 class ToolProviderRegistryClass {
   private providers: Map<TaskSource, IToolProvider> = new Map();
+  private connectionCache: Map<TaskSource, ConnectionCacheEntry> = new Map();
+  private readonly CONNECTION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   /**
    * Register a tool provider
@@ -60,6 +70,45 @@ class ToolProviderRegistryClass {
   }
 
   /**
+   * Check if a provider is connected, with caching
+   */
+  private async isProviderConnected(provider: IToolProvider): Promise<boolean> {
+    const now = Date.now();
+    const cached = this.connectionCache.get(provider.meta.id);
+
+    // Return cached value if still valid
+    if (cached && (now - cached.timestamp) < this.CONNECTION_CACHE_TTL_MS) {
+      return cached.isConnected;
+    }
+
+    // Fetch fresh value
+    try {
+      const isConnected = await provider.isConnected();
+      this.connectionCache.set(provider.meta.id, { isConnected, timestamp: now });
+      return isConnected;
+    } catch (error) {
+      console.error(`[ToolProviderRegistry] ${provider.meta.id}.isConnected() threw:`, error);
+      // Cache the failure as not connected
+      this.connectionCache.set(provider.meta.id, { isConnected: false, timestamp: now });
+      return false;
+    }
+  }
+
+  /**
+   * Invalidate connection cache for a specific provider (call after connect/disconnect)
+   */
+  invalidateConnectionCache(source: TaskSource): void {
+    this.connectionCache.delete(source);
+  }
+
+  /**
+   * Clear all connection caches
+   */
+  clearConnectionCache(): void {
+    this.connectionCache.clear();
+  }
+
+  /**
    * Get all connected providers
    */
   async getConnected(): Promise<IToolProvider[]> {
@@ -68,12 +117,9 @@ class ToolProviderRegistryClass {
 
     await Promise.all(
       providers.map(async (provider) => {
-        try {
-          if (await provider.isConnected()) {
-            connected.push(provider);
-          }
-        } catch {
-          // Provider connection check failed, skip it
+        const isConnected = await this.isProviderConnected(provider);
+        if (isConnected) {
+          connected.push(provider);
         }
       })
     );
@@ -89,21 +135,27 @@ class ToolProviderRegistryClass {
     results: ProviderResult<UnifiedTask[]>[];
   }> {
     const connectedProviders = await this.getConnected();
+
     const results: ProviderResult<UnifiedTask[]>[] = [];
     const allTasks: UnifiedTask[] = [];
 
     await Promise.all(
       connectedProviders.map(async (provider) => {
         // Skip providers that don't support task fetching
-        if (!provider.meta.capabilities.canFetchTasks) return;
+        if (!provider.meta.capabilities.canFetchTasks) {
+          console.log(`[ToolProviderRegistry] Skipping ${provider.meta.id} - canFetchTasks is false`);
+          return;
+        }
 
         try {
           const result = await provider.getTasks(filter);
+
           results.push(result);
           if (result.data) {
             allTasks.push(...result.data);
           }
         } catch (error) {
+          console.error(`[ToolProviderRegistry] ${provider.meta.id} threw error:`, error);
           results.push({
             data: null,
             error: error instanceof Error ? error.message : 'Unknown error',
@@ -205,10 +257,11 @@ class ToolProviderRegistryClass {
   }
 
   /**
-   * Clear all providers (useful for testing)
+   * Clear all providers and caches (useful for testing)
    */
   clear(): void {
     this.providers.clear();
+    this.connectionCache.clear();
   }
 }
 

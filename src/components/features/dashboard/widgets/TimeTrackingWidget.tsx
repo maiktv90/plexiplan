@@ -6,7 +6,7 @@ import { DateTime }                                                        from 
 import { useBackendTimeTrackingStore, useTimeTrackingActions } from '@/stores/useBackendTimeTrackingStore';
 import { useCreateTimeTrackingMutation, useTimeTrackingsQuery } from '@/api/hooks/useTimeTracking';
 import { Card } from '@/components/ui/Card';
-import { IconButtonStyled, ButtonWrapper } from '@/components/features/time-tracking/styles.tracking';
+import { IconButtonStyled } from '@/components/features/time-tracking/styles.tracking';
 
 export const TimeTrackingWidget: React.FC = () => {
   const navigate = useNavigate();
@@ -239,32 +239,18 @@ export const TimeTrackingWidget: React.FC = () => {
 
   return (
     <Card className="transition-shadow">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Time Tracking
-          </h3>
-          <button
-            onClick={() => navigate('/time-tracking')}
-            className="p-1 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-            title="Open Time Tracking"
-          >
-            <ChevronRightSquare className="w-5 h-5 text-gray-700 dark:text-gray-800" />
-          </button>
-        </div>
-        <div className={`w-3 h-3 rounded-full ${
-          isTimeTrackingActive && !isPaused
-            ? 'bg-green-500 animate-pulse'
-            : isPaused
-              ? 'bg-yellow-500'
-              : 'bg-gray-300 dark:bg-gray-600'
-          }`} />
-      </div>
-
-      <div className="space-y-4">
-        {/* Current Session */}
-        <div className="text-center">
-          <div className={`text-3xl font-inria font-bold mb-2 tracking-wider ${hasActiveSession ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'}`}>
+      {/* Horizontal layout - all in one row */}
+      <div className="flex items-center gap-6">
+        {/* Timer Display */}
+        <div className="flex items-center gap-3">
+          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+            isTimeTrackingActive && !isPaused
+              ? 'bg-green-500 animate-pulse'
+              : isPaused
+                ? 'bg-yellow-500'
+                : 'bg-gray-300 dark:bg-gray-600'
+            }`} />
+          <div className={`text-2xl font-inria font-bold tracking-wider ${hasActiveSession ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'}`}>
             {(() => {
               const { hours, minutes } = formatTimeParts(currentTimer);
               return (
@@ -283,26 +269,11 @@ export const TimeTrackingWidget: React.FC = () => {
               );
             })()}
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {hasActiveSession
-              ? (isPaused ? `${activeTracking?.task?.name || 'Current session'} (paused)` : (activeTracking?.task?.name || 'Current session'))
-              : 'No active session'}
-          </p>
         </div>
 
-        {/* Today's Total */}
-        <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="text-lg font-inria font-medium text-primary-600 dark:text-primary-400">
-            {formatTimeShort(todaysTotalTime)}
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Today's total
-          </p>
-        </div>
-
-        {/* Task Input (only show when not active and not paused) */}
-        {!isTimeTrackingActive && !isPaused && (
-          <div className="pt-2">
+        {/* Task Input or Current Task Name */}
+        <div className="flex-1 min-w-0">
+          {!isTimeTrackingActive && !isPaused ? (
             <input
               type="text"
               value={description}
@@ -310,61 +281,86 @@ export const TimeTrackingWidget: React.FC = () => {
               placeholder="What are you working on?"
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
             />
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="pt-2">
-          <ButtonWrapper>
-            {!isTimeTrackingActive && !isPaused ? (
-              <IconButtonStyled
-                onClick={handleStartTimer}
-                disabled={createTimeTrackingMutation.isPending}
-                style={{ fontSize: '2rem' }}
-              >
-                <Play style={{ width: '2rem', height: '2rem' }} />
-              </IconButtonStyled>
-            ) : (
-              <>
-                {isPaused ? (
-                  <IconButtonStyled
-                    onClick={handleResume}
-                    disabled={createTimeTrackingMutation.isPending}
-                    style={{ fontSize: '1.75rem' }}
-                  >
-                    <Play style={{ width: '1.75rem', height: '1.75rem' }} />
-                  </IconButtonStyled>
-                ) : (
-                  <IconButtonStyled
-                    onClick={handlePause}
-                    disabled={createTimeTrackingMutation.isPending}
-                    style={{ fontSize: '1.75rem' }}
-                  >
-                    <Pause style={{ width: '1.75rem', height: '1.75rem' }} />
-                  </IconButtonStyled>
-                )}
-                <button
-                  onClick={handleStopTimer}
-                  disabled={createTimeTrackingMutation.isPending}
-                  className="p-2 rounded-full transition-all duration-200 bg-transparent border-none cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 hover:shadow-[0_0_8px_rgba(239,68,68,0.4)]"
-                  style={{ color: '#ef4444' }}
-                >
-                  <Square style={{ width: '1.75rem', height: '1.75rem' }} />
-                </button>
-              </>
-            )}
-          </ButtonWrapper>
+          ) : (
+            <p className="text-sm text-gray-700 dark:text-gray-300 truncate">
+              {isPaused
+                ? <span>{activeTracking?.task?.name || 'Current session'} <span className="text-yellow-600 dark:text-yellow-400">(paused)</span></span>
+                : (activeTracking?.task?.name || 'Current session')}
+            </p>
+          )}
         </div>
 
-        {/* Error display */}
-        {createTimeTrackingMutation.error && (
-          <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-800 rounded-md">
-            <p className="text-xs text-red-600 dark:text-red-400">
-              Error: {createTimeTrackingMutation.error.message}
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {!isTimeTrackingActive && !isPaused ? (
+            <IconButtonStyled
+              onClick={handleStartTimer}
+              disabled={createTimeTrackingMutation.isPending}
+            >
+              <Play style={{ width: '1.5rem', height: '1.5rem' }} />
+            </IconButtonStyled>
+          ) : (
+            <>
+              {isPaused ? (
+                <IconButtonStyled
+                  onClick={handleResume}
+                  disabled={createTimeTrackingMutation.isPending}
+                >
+                  <Play style={{ width: '1.5rem', height: '1.5rem' }} />
+                </IconButtonStyled>
+              ) : (
+                <IconButtonStyled
+                  onClick={handlePause}
+                  disabled={createTimeTrackingMutation.isPending}
+                >
+                  <Pause style={{ width: '1.5rem', height: '1.5rem' }} />
+                </IconButtonStyled>
+              )}
+              <button
+                onClick={handleStopTimer}
+                disabled={createTimeTrackingMutation.isPending}
+                className="p-2 rounded-full transition-all duration-200 bg-transparent border-none cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 hover:shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                style={{ color: '#ef4444' }}
+              >
+                <Square style={{ width: '1.5rem', height: '1.5rem' }} />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+
+        {/* Today's Total */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="text-right">
+            <div className="text-lg font-inria font-medium text-primary-600 dark:text-primary-400">
+              {formatTimeShort(todaysTotalTime)}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Today
             </p>
           </div>
-        )}
+        </div>
+
+        {/* Open Full Page */}
+        <button
+          onClick={() => navigate('/time-tracking')}
+          className="p-2 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
+          title="Open Time Tracking"
+        >
+          <ChevronRightSquare className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        </button>
       </div>
+
+      {/* Error display */}
+      {createTimeTrackingMutation.error && (
+        <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-800 rounded-md">
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Error: {createTimeTrackingMutation.error.message}
+          </p>
+        </div>
+      )}
     </Card>
   );
 };

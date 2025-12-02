@@ -4,10 +4,8 @@
  * Full page view of all tasks aggregated from connected tools.
  * Shows boards and their associated tasks with filtering capabilities.
  */
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
 import {
-  ArrowLeft,
   ExternalLink,
   CheckCircle2,
   Clock,
@@ -19,10 +17,11 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import {
-  useUnifiedTasksQuery,
   useUnifiedBoardsQuery,
   getTaskSourceColor,
 } from '@/api/hooks/useUnifiedTasks';
+import { useDashboardQuery } from '@/api/hooks/useDashboard';
+import type { TaskStatusFilter } from '@/api/services/DashboardService';
 import { Button } from '@/components/ui/Button';
 import {
   Select,
@@ -31,7 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { UnifiedTask, UnifiedBoard, TaskSource, TaskStatus } from '@/types/task.types';
+import { BoardMultiSelect } from '@/components/features/tasks/BoardMultiSelect';
+import type { UnifiedTask, TaskSource, TaskStatus } from '@/types/task.types';
 
 /**
  * Status icon component
@@ -202,39 +202,119 @@ const TaskListItem: React.FC<{
   );
 };
 
+const STORAGE_KEY_SELECTED_BOARDS = 'plexify-tasks-selected-boards';
+const STORAGE_KEY_STATUS_FILTER = 'plexify-tasks-status-filter';
+
 /**
  * Main Tasks Page Component
  */
 export const TasksPage: React.FC = () => {
-  const [selectedBoardId, setSelectedBoardId] = useState<string>('all');
+  // Empty array means "all boards" selected - persist to localStorage
+  const [selectedBoardIds, setSelectedBoardIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_SELECTED_BOARDS);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'done'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'done'>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_STATUS_FILTER);
+      return (stored as 'all' | 'todo' | 'done') || 'todo';
+    } catch {
+      return 'todo';
+    }
+  });
 
-  const {
-    data: tasksData,
-    isLoading: tasksLoading,
-    refetch: refetchTasks,
-  } = useUnifiedTasksQuery();
-  const { data: boardsData } = useUnifiedBoardsQuery();
-  const tasks = tasksData?.tasks || [];
-  const boards = boardsData?.boards || [];
-
-  // Get task count per board (for dropdown labels)
-  const getTaskCountForBoard = (board: UnifiedBoard) => {
-    return tasks.filter((t) => t.source === board.source && t.boardId === board.sourceId).length;
+  // Persist selected boards to localStorage
+  const handleBoardSelectionChange = (boardIds: string[]) => {
+    setSelectedBoardIds(boardIds);
+    try {
+      localStorage.setItem(STORAGE_KEY_SELECTED_BOARDS, JSON.stringify(boardIds));
+    } catch {
+      // Ignore storage errors
+    }
   };
 
-  // Filter tasks
-  let filteredTasks = tasks;
-  if (selectedBoardId !== 'all') {
-    filteredTasks = filteredTasks.filter((t) => `${t.source}-${t.boardId}` === selectedBoardId);
-  }
-  if (statusFilter === 'done') {
-    filteredTasks = filteredTasks.filter((t) => t.status === 'done');
-  } else if (statusFilter === 'todo') {
-    // "To Do" means everything that's not done
-    filteredTasks = filteredTasks.filter((t) => t.status !== 'done');
-  }
+  // Persist status filter to localStorage
+  const handleStatusFilterChange = (value: 'all' | 'todo' | 'done') => {
+    setStatusFilter(value);
+    try {
+      localStorage.setItem(STORAGE_KEY_STATUS_FILTER, value);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  // Use dashboard endpoint with status filter for server-side filtering
+  const {
+    data: dashboardData,
+    isLoading: tasksLoading,
+    refetch: refetchTasks,
+  } = useDashboardQuery(statusFilter as TaskStatusFilter);
+  const { data: boardsData } = useUnifiedBoardsQuery();
+
+  // Map dashboard tasks to unified task format
+  const tasks: UnifiedTask[] = (dashboardData?.tasks || []).map((t) => ({
+    id: t.id,
+    source: t.source as TaskSource,
+    sourceId: t.sourceId,
+    title: t.title,
+    description: t.description,
+    status: t.status as TaskStatus,
+    priority: t.priority as UnifiedTask['priority'],
+    dueDate: t.dueDate,
+    url: t.url,
+    boardId: t.boardId,
+    boardName: t.boardName,
+    listId: t.listId,
+    listName: t.listName,
+    labels: t.labels?.map((l) => ({ id: l.id, name: l.name, color: l.color })),
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  }));
+  const boards = boardsData?.boards || [];
+
+  // Build task count per board for the dropdown
+  const taskCountByBoard = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const board of boards) {
+      const count = tasks.filter(
+        (t) => t.source === board.source && t.boardId === board.sourceId
+      ).length;
+      counts.set(board.id, count);
+    }
+    return counts;
+  }, [tasks, boards]);
+
+  // Build set of selected board IDs for efficient lookup
+  // Special marker '__none__' means explicitly no boards selected
+  const isNoneSelected = selectedBoardIds.length === 1 && selectedBoardIds[0] === '__none__';
+  const isAllBoardsSelected = selectedBoardIds.length === 0;
+  const selectedBoardIdSet = useMemo(
+    () => new Set(isNoneSelected ? [] : selectedBoardIds),
+    [selectedBoardIds, isNoneSelected]
+  );
+
+  // Filter tasks by selected boards (status is already filtered by backend)
+  const filteredTasks = useMemo(() => {
+    // If none selected, return empty
+    if (isNoneSelected) {
+      return [];
+    }
+
+    let result = tasks;
+
+    // Filter by boards (if specific boards selected)
+    if (!isAllBoardsSelected) {
+      result = result.filter((t) => selectedBoardIdSet.has(`${t.source}-${t.boardId}`));
+    }
+
+    // Note: Status filtering is now done server-side via the statusFilter query param
+    return result;
+  }, [tasks, isAllBoardsSelected, selectedBoardIdSet, isNoneSelected]);
 
   // Helper to get board name from boards array
   const getBoardName = (task: UnifiedTask): string => {
@@ -247,47 +327,40 @@ export const TasksPage: React.FC = () => {
     return board?.name || 'Unknown Board';
   };
 
-  // Group tasks by board when "All Boards" is selected
-  const groupedTasks = selectedBoardId === 'all'
-    ? filteredTasks.reduce((acc, task) => {
-        const key = `${task.source}-${task.boardId}`;
-        if (!acc[key]) {
-          acc[key] = {
-            boardId: key,
-            boardName: getBoardName(task),
-            source: task.source,
-            tasks: [],
-          };
-        }
-        acc[key].tasks.push(task);
-        return acc;
-      }, {} as Record<string, { boardId: string; boardName: string; source: TaskSource; tasks: UnifiedTask[] }>)
-    : null;
+  // Group tasks by board (always group for better organization)
+  const groupedTasks = useMemo(() => {
+    return filteredTasks.reduce((acc, task) => {
+      const key = `${task.source}-${task.boardId}`;
+      if (!acc[key]) {
+        acc[key] = {
+          boardId: key,
+          boardName: getBoardName(task),
+          source: task.source,
+          tasks: [],
+        };
+      }
+      acc[key].tasks.push(task);
+      return acc;
+    }, {} as Record<string, { boardId: string; boardName: string; source: TaskSource; tasks: UnifiedTask[] }>);
+  }, [filteredTasks, boards]);
+
+  // Sort grouped tasks by source then board name
+  const sortedGroupedTasks = useMemo(() => {
+    const sourceOrder: TaskSource[] = ['jira', 'trello', 'github', 'bitbucket'];
+    return Object.values(groupedTasks).sort((a, b) => {
+      const aSourceIndex = sourceOrder.indexOf(a.source);
+      const bSourceIndex = sourceOrder.indexOf(b.source);
+      const sourceCompare = (aSourceIndex === -1 ? 999 : aSourceIndex) - (bSourceIndex === -1 ? 999 : bSourceIndex);
+      if (sourceCompare !== 0) return sourceCompare;
+      return a.boardName.localeCompare(b.boardName);
+    });
+  }, [groupedTasks]);
+
+  // Determine if we should show grouped view
+  const showGroupedView = isAllBoardsSelected || selectedBoardIds.length > 1;
 
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link
-                to="/dashboard"
-                className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                <span className="hidden sm:inline">Back to Dashboard</span>
-              </Link>
-            </div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Tasks & Boards</h1>
-            <Button variant="outline" size="sm" onClick={() => refetchTasks()}>
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Tasks Section */}
         <section>
@@ -300,23 +373,16 @@ export const TasksPage: React.FC = () => {
             </h2>
 
             <div className="flex items-center gap-2">
-              {/* Board Filter */}
-              <Select value={selectedBoardId} onValueChange={setSelectedBoardId}>
-                <SelectTrigger className="w-[180px] border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
-                  <SelectValue placeholder="All Boards" />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600">
-                  <SelectItem value="all">All Boards</SelectItem>
-                  {boards.map((board) => (
-                    <SelectItem key={board.id} value={board.id}>
-                      {board.name} ({getTaskCountForBoard(board)})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Board Filter - Multi-Select with Grouping */}
+              <BoardMultiSelect
+                boards={boards}
+                selectedBoardIds={selectedBoardIds}
+                onSelectionChange={handleBoardSelectionChange}
+                taskCountByBoard={taskCountByBoard}
+              />
 
               {/* Status Filter */}
-              <Select value={statusFilter} onValueChange={(value: 'all' | 'todo' | 'done') => setStatusFilter(value)}>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger className="w-[100px] border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
@@ -350,6 +416,17 @@ export const TasksPage: React.FC = () => {
                   <LayoutGrid className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Refresh Button - Icon only */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refetchTasks()}
+                title="Refresh tasks"
+                className="p-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
             </div>
           </div>
 
@@ -368,15 +445,15 @@ export const TasksPage: React.FC = () => {
               <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
               <p className="text-gray-600 dark:text-gray-400 font-medium">No tasks found</p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-                {selectedBoardId !== 'all'
-                  ? 'This board has no matching tasks'
+                {!isAllBoardsSelected
+                  ? 'Selected boards have no matching tasks'
                   : 'No tasks assigned to you'}
               </p>
             </div>
-          ) : groupedTasks ? (
-            // Grouped view when "All Boards" is selected
+          ) : showGroupedView ? (
+            // Grouped view when multiple boards are shown
             <div className="space-y-4">
-              {Object.values(groupedTasks).map((group) => (
+              {sortedGroupedTasks.map((group) => (
                 <BoardGroup
                   key={group.boardId}
                   boardId={group.boardId}
@@ -387,7 +464,7 @@ export const TasksPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            // Flat list when a specific board is selected
+            // Flat list when a single board is selected
             <div className="space-y-3">
               {filteredTasks.map((task) => (
                 <TaskListItem key={task.id} task={task} />

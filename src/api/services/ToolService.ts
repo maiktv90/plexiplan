@@ -1,5 +1,5 @@
 import { toolsApiClient } from '../client/instances';
-import type { IntegrationsResponse, RegisterPATRequest } from '@/types/tool.types';
+import type { IntegrationsResponse, RegisterPATRequest, UpdateToolOrderRequest, ToolOrderResponse } from '@/types/tool.types';
 
 /**
  * Response from OAuth initiation endpoint
@@ -96,5 +96,19 @@ export const ToolService = {
     } catch {
       return { valid: false, error: 'Failed to validate credentials' };
     }
+  },
+
+  /**
+   * Update the display order of connected tools
+   * PUT /planner/api/v1/tools/order
+   */
+  async updateToolOrder(request: UpdateToolOrderRequest): Promise<ToolOrderResponse> {
+    console.log('ToolService.updateToolOrder - sending request:', JSON.stringify(request));
+    const response = await toolsApiClient.put<ToolOrderResponse>('/order', request);
+    console.log('ToolService.updateToolOrder - response:', response);
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to update tool order');
+    }
+    return response.data;
   },
 };

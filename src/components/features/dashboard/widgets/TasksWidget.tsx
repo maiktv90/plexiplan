@@ -3,14 +3,17 @@
  *
  * Displays active tasks aggregated from all connected tools (Trello, Jira, etc.)
  * Uses the unified task provider system for seamless multi-tool integration.
+ *
+ * When used inside DashboardDataProvider, uses aggregated dashboard data.
+ * Falls back to individual API calls when used outside the provider.
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
-import { useActiveTasksQuery } from '@/api/hooks/useUnifiedTasks';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import type { UnifiedTask, TaskStatus } from '@/types/task.types';
+import { useDashboardTasks } from '../DashboardDataProvider';
 
 /**
  * Get status icon component
@@ -63,7 +66,8 @@ const TaskItem: React.FC<{ task: UnifiedTask }> = ({ task }) => {
  * Main Tasks Widget Component
  */
 export const TasksWidget: React.FC = () => {
-  const { data, isLoading, error, refetch } = useActiveTasksQuery();
+  // Use aggregated dashboard data (single API call for all widgets)
+  const { data, isLoading, error, refetch } = useDashboardTasks();
 
   if (isLoading) {
     return (

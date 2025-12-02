@@ -66,7 +66,7 @@ export const ButtonWrapper: React.FC<{ children: React.ReactNode; style?: React.
 // Tracking card component
 export const TrackingCard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-4 hover:shadow-md transition-shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-4 hover:shadow-md transition-shadow">
       {children}
     </div>
   );

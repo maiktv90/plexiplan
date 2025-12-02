@@ -53,6 +53,7 @@ export interface UnifiedPullRequest {
   status: 'open' | 'merged' | 'closed' | 'draft';
   createdAt?: string;
   updatedAt?: string;
+  isAuthor?: boolean; // true if current user created this PR, false if they're a reviewer
 }
 
 /**

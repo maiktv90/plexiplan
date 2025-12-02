@@ -37,7 +37,7 @@ const timeTrackingApiBaseUrl = isExtensionContext ? `${PLANNER_BACKEND}/planner/
 
 export const timeTrackingApiClient = new ApiClient({
   baseURL: timeTrackingApiBaseUrl,
-  timeout: 8000,
+  timeout: 30000, // 30 seconds - Bitbucket repos can take longer to load
 });
 
 // Configuration API client (planner backend on port 8081)

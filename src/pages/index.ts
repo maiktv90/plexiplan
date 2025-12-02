@@ -8,3 +8,4 @@ export { CreateBookingPage } from './CreateBookingPage';
 export { SettingsPage } from './SettingsPage';
 export { TrelloCallbackPage } from './TrelloCallbackPage';
 export { TasksPage } from './TasksPage';
+export { RepositoriesPage } from './RepositoriesPage';

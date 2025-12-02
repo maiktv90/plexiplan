@@ -1,30 +1,39 @@
 // Pull Requests Widget - Shows PRs from connected code management tools
-import React from 'react';
+import React, { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { ExternalLink, GitPullRequest, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { usePullRequestsQuery } from '@/api/hooks/usePullRequests';
-import type { UnifiedPullRequest } from '@/providers/tools/ToolProvider.interface';
+import { useDashboardPullRequests } from '../DashboardDataProvider';
+import { useIntegrationsQuery } from '@/api/hooks/useTools';
 
-const getStatusColor = (status: UnifiedPullRequest['status']) => {
-  switch (status) {
-    case 'open':
-      return 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300';
-    case 'draft':
-      return 'bg-gray-100 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300';
-    case 'merged':
-      return 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300';
-    case 'closed':
-      return 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300';
-    default:
-      return 'bg-gray-100 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300';
-  }
+const MAX_PULL_REQUESTS = 4;
+
+/**
+ * Format a date string as relative time (e.g., "2h ago", "3d ago")
+ */
+const formatRelativeTime = (dateString?: string): string => {
+  if (!dateString) return '';
+
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
 };
 
 const getSourceBadge = (source: string) => {
   switch (source) {
     case 'github':
-      return 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900';
+      return 'bg-gray-900 dark:bg-gray-800 text-white';
     case 'bitbucket':
       return 'bg-blue-600 text-white';
     default:
@@ -33,10 +42,34 @@ const getSourceBadge = (source: string) => {
 };
 
 export const PullRequestsWidget: React.FC = () => {
-  const { data, isLoading, isError, refetch } = usePullRequestsQuery();
+  // Use aggregated dashboard data (single API call for all widgets)
+  const { data, isLoading, isError, refetch } = useDashboardPullRequests();
+  const { data: integrations } = useIntegrationsQuery();
 
-  const pullRequests = data?.pullRequests || [];
-  const openPRs = pullRequests.filter((pr) => pr.status === 'open' || pr.status === 'draft');
+  // Get tool order from connected tools
+  const toolOrderMap = useMemo(() => {
+    const orderMap = new Map<string, number>();
+    if (integrations?.connectedTools) {
+      integrations.connectedTools.forEach((tool) => {
+        // Map clientKey to source name (e.g., 'github-oauth' -> 'github')
+        const source = tool.clientKey.replace(/-oauth$/, '').replace(/-pat$/, '');
+        orderMap.set(source, tool.order ?? 999);
+      });
+    }
+    return orderMap;
+  }, [integrations?.connectedTools]);
+
+  // Sort PRs by tool order, then by updated date
+  const openPRs = useMemo(() => {
+    const prs = data?.pullRequests || [];
+    return [...prs].sort((a, b) => {
+      const aOrder = toolOrderMap.get(a.source) ?? 999;
+      const bOrder = toolOrderMap.get(b.source) ?? 999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      // Same source: sort by updated date (most recent first)
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+    });
+  }, [data?.pullRequests, toolOrderMap]);
 
   if (isLoading) {
     return (
@@ -84,7 +117,7 @@ export const PullRequestsWidget: React.FC = () => {
         </div>
       </div>
 
-      {pullRequests.length === 0 ? (
+      {openPRs.length === 0 ? (
         <div className="text-center py-6">
           <GitPullRequest className="h-10 w-10 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-500 dark:text-gray-400 mb-1">No pull requests found</p>
@@ -93,43 +126,53 @@ export const PullRequestsWidget: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {openPRs.slice(0, 5).map((pr) => (
-            <a
-              key={pr.id}
-              href={pr.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {pr.title}
-                  </p>
-                  <ExternalLink className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-1.5 py-0.5 text-xs rounded ${getSourceBadge(pr.source)}`}>
-                    {pr.source}
+        <>
+          <div className="space-y-2">
+            {openPRs.slice(0, MAX_PULL_REQUESTS).map((pr) => {
+              const isReviewer = pr.isAuthor === false;
+              return (
+                <a
+                  key={pr.id}
+                  href={pr.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {isReviewer && (
+                        <span title="You are a reviewer" className="flex-shrink-0 text-sm">👀</span>
+                      )}
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {pr.title}
+                      </p>
+                      <ExternalLink className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 text-xs rounded ${getSourceBadge(pr.source)}`}>
+                        {pr.source}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {pr.owner}/{pr.repository}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-2">
+                    {formatRelativeTime(pr.updatedAt)}
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                    {pr.owner}/{pr.repository}
-                  </span>
-                </div>
-              </div>
-              <span className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ml-2 ${getStatusColor(pr.status)}`}>
-                {pr.status}
-              </span>
-            </a>
-          ))}
+                </a>
+              );
+            })}
+          </div>
 
-          {openPRs.length > 5 && (
-            <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-              +{openPRs.length - 5} more
-            </p>
-          )}
-        </div>
+          {/* View All link */}
+          <Link
+            to="/repositories"
+            className="block mt-3 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-center text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            View all {openPRs.length > MAX_PULL_REQUESTS ? `(${openPRs.length - MAX_PULL_REQUESTS} more)` : ''}
+          </Link>
+        </>
       )}
     </Card>
   );

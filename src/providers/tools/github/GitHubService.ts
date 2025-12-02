@@ -26,6 +26,8 @@ export interface GitHubPullRequest {
   owner: string;
   repo: string;
   url: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /**

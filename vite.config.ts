@@ -27,10 +27,23 @@ export default defineConfig({
     global: 'globalThis',
   },
   server: {
+    allowedHosts: ['.ngrok-free.app', '.ngrok.io'],
     proxy: {
       '/planner': {
         target: 'http://localhost:8081',
         changeOrigin: true,
+        cookieDomainRewrite: '',  // Rewrite cookie domain to match frontend
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            // Forward the original host to backend so it can construct correct URLs
+            const host = req.headers.host;
+            if (host) {
+              proxyReq.setHeader('X-Forwarded-Host', host);
+              proxyReq.setHeader('X-Forwarded-Proto', host.includes('ngrok') ? 'https' : 'http');
+            }
+          });
+        },
       },
       '/config': {
         target: 'http://localhost:8081',

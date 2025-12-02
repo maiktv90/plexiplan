@@ -44,7 +44,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onSectionChange,
 }) => {
   return (
-    <nav className="w-64 flex-shrink-0">
+    <nav className="w-auto lg:w-56 flex-shrink-0">
       <ul className="space-y-1">
         {SIDEBAR_ITEMS.map((item) => {
           const isActive = activeSection === item.id;
@@ -55,8 +55,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               <button
                 onClick={() => !isDisabled && onSectionChange(item.id)}
                 disabled={isDisabled}
+                title={item.label}
                 className={`
-                  w-full flex items-start gap-3 px-3 py-3 rounded-lg text-left transition-colors
+                  w-full flex items-center lg:items-start gap-3 px-3 py-3 rounded-lg text-left transition-colors
                   ${isActive
                     ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
                     : isDisabled
@@ -65,10 +66,10 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                   }
                 `}
               >
-                <span className={`mt-0.5 ${isActive ? 'text-primary-500' : ''}`}>
+                <span className={`lg:mt-0.5 ${isActive ? 'text-primary-500' : ''}`}>
                   {item.icon}
                 </span>
-                <div className="flex-1 min-w-0">
+                <div className="hidden lg:block flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{item.label}</span>
                     {isDisabled && (

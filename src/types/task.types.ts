@@ -9,7 +9,7 @@
 /**
  * Supported task source tools
  */
-export type TaskSource = 'trello' | 'jira' | 'github' | 'azure-devops';
+export type TaskSource = 'trello' | 'jira' | 'github' | 'bitbucket' | 'azure-devops';
 
 /**
  * Task status normalized across tools

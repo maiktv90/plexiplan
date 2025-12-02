@@ -12,6 +12,7 @@ import {
   CreateBookingPage,
   SettingsPage,
   TasksPage,
+  RepositoriesPage,
 } from '@/pages';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -95,6 +96,10 @@ const router = createHashRouter([
           {
             path: 'tasks',
             element: <TasksPage />,
+          },
+          {
+            path: 'repositories',
+            element: <RepositoriesPage />,
           },
         ],
       },

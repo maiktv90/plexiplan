@@ -23,6 +23,7 @@ export class ApiClient {
     this.client = axios.create({
       baseURL: config.baseURL,
       timeout: config.timeout || 10000,
+      withCredentials: true,  // Required for cookies to be sent/received
       headers: {
         'Content-Type': 'application/json',
         ...config.headers,
@@ -181,43 +182,80 @@ export class ApiClient {
 
   // HTTP Methods
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.get<T>(url, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.get<T>(url, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      // If the interceptor already normalized the error, return it
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      // Otherwise normalize it
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.post<T>(url, data, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.post<T>(url, data, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.put<T>(url, data, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.put<T>(url, data, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.delete<T>(url, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.delete<T>(url, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.patch<T>(url, data, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.patch<T>(url, data, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   // Raw axios instance for advanced use cases
