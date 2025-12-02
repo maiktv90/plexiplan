@@ -239,40 +239,101 @@ export const TimeTrackingWidget: React.FC = () => {
 
   return (
     <Card className="transition-shadow">
-      {/* Horizontal layout - all in one row */}
-      <div className="flex items-center gap-6">
-        {/* Timer Display */}
-        <div className="flex items-center gap-3">
-          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-            isTimeTrackingActive && !isPaused
-              ? 'bg-green-500 animate-pulse'
-              : isPaused
-                ? 'bg-yellow-500'
-                : 'bg-gray-300 dark:bg-gray-600'
-            }`} />
-          <div className={`text-2xl font-inria font-bold tracking-wider ${hasActiveSession ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'}`}>
-            {(() => {
-              const { hours, minutes } = formatTimeParts(currentTimer);
-              return (
-                <>
-                  <span>{hours}</span>
-                  <span
-                    style={{
-                      opacity: colonVisible ? 1 : 0,
-                      transition: 'opacity 0.1s ease-in-out'
-                    }}
+      {/* Responsive layout - stacks on small screens */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 md:gap-6">
+        {/* Top row on mobile: Timer + Actions + Today's Total */}
+        <div className="flex items-center justify-between sm:contents">
+          {/* Timer Display */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0 ${
+              isTimeTrackingActive && !isPaused
+                ? 'bg-green-500 animate-pulse'
+                : isPaused
+                  ? 'bg-yellow-500'
+                  : 'bg-gray-300 dark:bg-gray-600'
+              }`} />
+            <div className={`text-xl sm:text-2xl font-inria font-bold tracking-wider ${hasActiveSession ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'}`}>
+              {(() => {
+                const { hours, minutes } = formatTimeParts(currentTimer);
+                return (
+                  <>
+                    <span>{hours}</span>
+                    <span
+                      style={{
+                        opacity: colonVisible ? 1 : 0,
+                        transition: 'opacity 0.1s ease-in-out'
+                      }}
+                    >
+                      :
+                    </span>
+                    <span>{minutes}</span>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Mobile: Action Buttons + Today's Total grouped together */}
+          <div className="flex items-center gap-2 sm:hidden">
+            {/* Today's Total - compact on mobile */}
+            <div className="text-right mr-1">
+              <div className="text-sm font-inria font-medium text-primary-600 dark:text-primary-400">
+                {formatTimeShort(todaysTotalTime)}
+              </div>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                Today
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            {!isTimeTrackingActive && !isPaused ? (
+              <IconButtonStyled
+                onClick={handleStartTimer}
+                disabled={createTimeTrackingMutation.isPending}
+              >
+                <Play style={{ width: '1.25rem', height: '1.25rem' }} />
+              </IconButtonStyled>
+            ) : (
+              <>
+                {isPaused ? (
+                  <IconButtonStyled
+                    onClick={handleResume}
+                    disabled={createTimeTrackingMutation.isPending}
                   >
-                    :
-                  </span>
-                  <span>{minutes}</span>
-                </>
-              );
-            })()}
+                    <Play style={{ width: '1.25rem', height: '1.25rem' }} />
+                  </IconButtonStyled>
+                ) : (
+                  <IconButtonStyled
+                    onClick={handlePause}
+                    disabled={createTimeTrackingMutation.isPending}
+                  >
+                    <Pause style={{ width: '1.25rem', height: '1.25rem' }} />
+                  </IconButtonStyled>
+                )}
+                <button
+                  onClick={handleStopTimer}
+                  disabled={createTimeTrackingMutation.isPending}
+                  className="p-1.5 sm:p-2 rounded-full transition-all duration-200 bg-transparent border-none cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 hover:shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                  style={{ color: '#ef4444' }}
+                >
+                  <Square style={{ width: '1.25rem', height: '1.25rem' }} />
+                </button>
+              </>
+            )}
+
+            {/* Open Full Page - mobile */}
+            <button
+              onClick={() => navigate('/time-tracking')}
+              className="p-1.5 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="Open Time Tracking"
+            >
+              <ChevronRightSquare className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            </button>
           </div>
         </div>
 
-        {/* Task Input or Current Task Name */}
-        <div className="flex-1 min-w-0">
+        {/* Task Input or Current Task Name - full width on mobile */}
+        <div className="flex-1 min-w-0 order-last sm:order-none">
           {!isTimeTrackingActive && !isPaused ? (
             <input
               type="text"
@@ -290,8 +351,8 @@ export const TimeTrackingWidget: React.FC = () => {
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Desktop: Action Buttons */}
+        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
           {!isTimeTrackingActive && !isPaused ? (
             <IconButtonStyled
               onClick={handleStartTimer}
@@ -328,11 +389,11 @@ export const TimeTrackingWidget: React.FC = () => {
           )}
         </div>
 
-        {/* Divider */}
-        <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+        {/* Desktop: Divider */}
+        <div className="hidden sm:block h-8 w-px bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
 
-        {/* Today's Total */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Desktop: Today's Total */}
+        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
           <div className="text-right">
             <div className="text-lg font-inria font-medium text-primary-600 dark:text-primary-400">
               {formatTimeShort(todaysTotalTime)}
@@ -343,10 +404,10 @@ export const TimeTrackingWidget: React.FC = () => {
           </div>
         </div>
 
-        {/* Open Full Page */}
+        {/* Desktop: Open Full Page */}
         <button
           onClick={() => navigate('/time-tracking')}
-          className="p-2 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
+          className="hidden sm:block p-2 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
           title="Open Time Tracking"
         >
           <ChevronRightSquare className="w-5 h-5 text-gray-500 dark:text-gray-400" />

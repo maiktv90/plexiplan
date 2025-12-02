@@ -3,9 +3,17 @@
  *
  * Full page view of all pull requests from connected code management tools.
  * Grouped by source (GitHub, Bitbucket, etc.) and then by repository.
+ *
+ * Performance optimizations:
+ * - React.memo on all list components to prevent unnecessary re-renders
+ * - useCallback for event handlers to maintain referential equality
+ * - useMemo for expensive computations (grouping, sorting, filtering)
+ * - Virtual scrolling for repositories with many PRs (>10 items)
+ * - Dashboard API for single-call data fetching
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, memo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   ExternalLink,
   GitPullRequest,
@@ -19,6 +27,13 @@ import { useIntegrationsQuery } from '@/api/hooks/useTools';
 import { useRepositoriesPageStore } from '@/stores/useRepositoriesPageStore';
 import { Button } from '@/components/ui/Button';
 import type { UnifiedPullRequest } from '@/providers/tools/ToolProvider.interface';
+
+/** Threshold for enabling virtualization (number of PRs) */
+const VIRTUALIZATION_THRESHOLD = 10;
+/** Estimated height of each PR item in pixels */
+const PR_ITEM_HEIGHT = 72;
+/** Maximum height for virtualized list container */
+const MAX_VIRTUAL_LIST_HEIGHT = 400;
 
 /**
  * Format a date string as relative time (e.g., "2h ago", "3d ago")
@@ -52,6 +67,17 @@ const getSourceBadge = (source: string) => {
   }
 };
 
+const getSourceBorderColor = (source: string) => {
+  switch (source) {
+    case 'github':
+      return 'border-gray-900';
+    case 'bitbucket':
+      return 'border-blue-600';
+    default:
+      return 'border-gray-200';
+  }
+}
+
 const getSourceDisplayName = (source: string) => {
   switch (source) {
     case 'github':
@@ -63,61 +89,141 @@ const getSourceDisplayName = (source: string) => {
   }
 };
 
-const PullRequestItem: React.FC<{ pr: UnifiedPullRequest }> = ({ pr }) => {
-  const isReviewer = pr.isAuthor === false;
+/**
+ * Single pull request item - memoized to prevent unnecessary re-renders
+ */
+const PullRequestItem = memo<{ pr: UnifiedPullRequest; style?: React.CSSProperties }>(
+  ({ pr, style }) => {
+    const isReviewer = pr.isAuthor === false;
+
+    return (
+      <div style={style}>
+        <a
+          href={pr.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow group"
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              {isReviewer ? (
+                <span title="You are a reviewer" className="flex-shrink-0">
+                  👀
+                </span>
+              ) : (
+                <span title="You are the creator" className="flex-shrink-0">
+                  🧘
+                </span>
+              )}
+              <p className="font-medium text-gray-900 dark:text-white truncate">{pr.title}</p>
+              <ExternalLink className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            </div>
+            {pr.branchName && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                  {pr.branchName}
+                </span>
+              </div>
+            )}
+          </div>
+          <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-4">
+            {formatRelativeTime(pr.updatedAt)}
+          </span>
+        </a>
+      </div>
+    );
+  }
+);
+PullRequestItem.displayName = 'PullRequestItem';
+
+/**
+ * Virtualized list for rendering many pull requests efficiently
+ * Only renders items visible in the viewport + overscan buffer
+ */
+const VirtualizedPRList = memo<{ pullRequests: UnifiedPullRequest[] }>(({ pullRequests }) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: pullRequests.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => PR_ITEM_HEIGHT,
+    overscan: 3, // Render 3 extra items above/below viewport for smooth scrolling
+  });
+
+  const containerHeight = Math.min(pullRequests.length * PR_ITEM_HEIGHT, MAX_VIRTUAL_LIST_HEIGHT);
 
   return (
-    <a
-      href={pr.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow group"
+    <div
+      ref={parentRef}
+      className="overflow-auto"
+      style={{ height: containerHeight, maxHeight: MAX_VIRTUAL_LIST_HEIGHT }}
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          {isReviewer ? (
-            <span title="You are a reviewer" className="flex-shrink-0">👀</span>
-          ) : (
-            <span title="You are the creator" className="flex-shrink-0">🧘</span>
-          )}
-          <p className="font-medium text-gray-900 dark:text-white truncate">{pr.title}</p>
-          <ExternalLink className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-        </div>
-        {pr.branchName && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
-              {pr.branchName}
-            </span>
-          </div>
-        )}
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const pr = pullRequests[virtualItem.index];
+          return (
+            <div
+              key={pr.id}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualItem.size}px`,
+                transform: `translateY(${virtualItem.start}px)`,
+                padding: '4px 0',
+              }}
+            >
+              <PullRequestItem pr={pr} />
+            </div>
+          );
+        })}
       </div>
-      <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-4">
-        {formatRelativeTime(pr.updatedAt)}
-      </span>
-    </a>
+    </div>
   );
-};
+});
+VirtualizedPRList.displayName = 'VirtualizedPRList';
+
+/**
+ * Standard (non-virtualized) list for small number of PRs
+ */
+const StandardPRList = memo<{ pullRequests: UnifiedPullRequest[] }>(({ pullRequests }) => (
+  <div className="space-y-2">
+    {pullRequests.map((pr) => (
+      <PullRequestItem key={pr.id} pr={pr} />
+    ))}
+  </div>
+));
+StandardPRList.displayName = 'StandardPRList';
 
 /**
  * Collapsible repository group for PRs (nested inside source group)
+ * Uses virtualization when PR count exceeds threshold
  */
-const RepositoryGroup: React.FC<{
+const RepositoryGroup = memo<{
   repoKey: string;
   owner: string;
   repository: string;
   pullRequests: UnifiedPullRequest[];
-}> = ({ repoKey, owner, repository, pullRequests }) => {
+}>(({ repoKey, owner, repository, pullRequests }) => {
   const { isRepoExpanded, toggleRepo } = useRepositoriesPageStore();
   const isExpanded = isRepoExpanded(repoKey);
 
-  const openCount = pullRequests.filter(
-    (pr) => pr.status === 'open' || pr.status === 'draft'
-  ).length;
+  const handleToggle = useCallback(() => toggleRepo(repoKey), [toggleRepo, repoKey]);
+
+  // Determine if we should use virtualization
+  const useVirtualization = pullRequests.length > VIRTUALIZATION_THRESHOLD;
 
   return (
     <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
       <button
-        onClick={() => toggleRepo(repoKey)}
+        onClick={handleToggle}
         className="w-full flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
       >
         <div className="flex items-center gap-2">
@@ -130,39 +236,42 @@ const RepositoryGroup: React.FC<{
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {owner}/{repository}
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            ({pullRequests.length} PR{pullRequests.length !== 1 ? 's' : ''}, {openCount} open)
+          <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            {pullRequests.length}
+            <GitPullRequest className="w-3 h-3" />
           </span>
         </div>
       </button>
       {isExpanded && (
-        <div className="p-2 space-y-2 bg-gray-50 dark:bg-gray-800">
-          {pullRequests.map((pr) => (
-            <PullRequestItem key={pr.id} pr={pr} />
-          ))}
+        <div className="p-2 bg-gray-50 dark:bg-gray-800">
+          {useVirtualization ? (
+            <VirtualizedPRList pullRequests={pullRequests} />
+          ) : (
+            <StandardPRList pullRequests={pullRequests} />
+          )}
         </div>
       )}
     </div>
   );
-};
+});
+RepositoryGroup.displayName = 'RepositoryGroup';
 
 /**
  * Collapsible source group for PRs
  */
-const SourceGroup: React.FC<{
+const SourceGroup = memo<{
   source: string;
   pullRequests: UnifiedPullRequest[];
-}> = ({ source, pullRequests }) => {
+}>(({ source, pullRequests }) => {
   const { isSourceExpanded, toggleSource } = useRepositoriesPageStore();
   const isExpanded = isSourceExpanded(source);
 
-  const openCount = pullRequests.filter(
-    (pr) => pr.status === 'open' || pr.status === 'draft'
-  ).length;
+  const handleToggle = useCallback(() => toggleSource(source), [toggleSource, source]);
 
   // Group PRs by repository within this source
   const groupedByRepo = useMemo(() => {
-    const groups: Record<string, { owner: string; repository: string; prs: UnifiedPullRequest[] }> = {};
+    const groups: Record<string, { owner: string; repository: string; prs: UnifiedPullRequest[] }> =
+      {};
 
     for (const pr of pullRequests) {
       const repoKey = `${pr.owner}/${pr.repository}`;
@@ -196,9 +305,9 @@ const SourceGroup: React.FC<{
   }, [groupedByRepo]);
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className={`border-l-2 ${getSourceBorderColor(source)} rounded-r-lg overflow-hidden`}>
       <button
-        onClick={() => toggleSource(source)}
+        onClick={handleToggle}
         className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
       >
         <div className="flex items-center gap-2">
@@ -209,9 +318,6 @@ const SourceGroup: React.FC<{
           )}
           <span className={`px-2 py-0.5 text-xs rounded ${getSourceBadge(source)}`}>
             {getSourceDisplayName(source)}
-          </span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            ({pullRequests.length} total, {openCount} open, {sortedRepoKeys.length} repo{sortedRepoKeys.length !== 1 ? 's' : ''})
           </span>
         </div>
       </button>
@@ -233,7 +339,8 @@ const SourceGroup: React.FC<{
       )}
     </div>
   );
-};
+});
+SourceGroup.displayName = 'SourceGroup';
 
 export const RepositoriesPage: React.FC = () => {
   const { data, isLoading, isError, refetch } = usePullRequestsQuery();
@@ -278,9 +385,7 @@ export const RepositoriesPage: React.FC = () => {
     });
   }, [groupedBySource, toolOrderMap]);
 
-  const totalOpen = pullRequests.filter(
-    (pr) => pr.status === 'open' || pr.status === 'draft'
-  ).length;
+  const handleRefresh = useCallback(() => refetch(), [refetch]);
 
   return (
     <div className="min-h-full bg-gray-50 dark:bg-gray-900">
@@ -289,18 +394,13 @@ export const RepositoriesPage: React.FC = () => {
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Pull Requests
-            {!isLoading && !isError && pullRequests.length > 0 && (
-              <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({pullRequests.length} total, {totalOpen} open)
-              </span>
-            )}
           </h2>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             title="Refresh pull requests"
-            className="p-2"
+            className="p-1.5 sm:p-2"
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -318,7 +418,7 @@ export const RepositoriesPage: React.FC = () => {
         ) : isError ? (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-red-600 dark:text-red-400 mb-3">Failed to load pull requests</p>
-            <Button size="sm" variant="outline" onClick={() => refetch()}>
+            <Button size="sm" variant="outline" onClick={handleRefresh}>
               Retry
             </Button>
           </div>
