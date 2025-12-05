@@ -24,7 +24,7 @@ export interface DashboardTask {
   source: string; // "jira", "trello"
   sourceId: string;
   title: string;
-  description?: string;
+  description?: string | object; // Can be plain text or ADF (Atlassian Document Format) object
   status: string; // "todo", "in_progress", "done"
   priority?: string;
   dueDate?: string;
@@ -36,6 +36,10 @@ export interface DashboardTask {
   labels?: DashboardTaskLabel[];
   createdAt?: string;
   updatedAt?: string;
+  /** External account ID for multi-account support (e.g., Trello user ID) */
+  externalAccountId?: string;
+  /** User-friendly label for multi-account support (e.g., "Work Trello") */
+  accountLabel?: string;
 }
 
 /**
@@ -53,6 +57,10 @@ export interface DashboardPullRequest {
   createdAt?: string;
   updatedAt?: string;
   isAuthor: boolean;
+  /** External account ID for multi-account support */
+  externalAccountId?: string;
+  /** User-friendly label for multi-account support */
+  accountLabel?: string;
 }
 
 /**

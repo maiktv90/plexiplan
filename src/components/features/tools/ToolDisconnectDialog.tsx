@@ -18,7 +18,10 @@ interface ToolDisconnectDialogProps {
   tool: ConnectedTool | null;
   isOpen: boolean;
   onClose: () => void;
-  onDisconnect: (clientKey: string) => void;
+  /**
+   * Disconnect callback with optional external account ID for multi-account support
+   */
+  onDisconnect: (clientKey: string, externalAccountId?: string) => void;
   isDisconnecting?: boolean;
 }
 
@@ -33,8 +36,12 @@ export const ToolDisconnectDialog: React.FC<ToolDisconnectDialogProps> = ({
 
   const toolDefinition = getToolByClientId(tool.clientKey);
 
+  // Determine the display name - use accountLabel if available (multi-account)
+  const displayName = tool.accountLabel || tool.label;
+
   const handleDisconnect = () => {
-    onDisconnect(tool.clientKey);
+    // Pass both clientKey and externalAccountId for multi-account disconnect
+    onDisconnect(tool.clientKey, tool.externalAccountId);
   };
 
   return (
@@ -43,14 +50,22 @@ export const ToolDisconnectDialog: React.FC<ToolDisconnectDialogProps> = ({
         <AlertDialogHeader>
           <div className="flex items-center gap-3 mb-2">
             {toolDefinition && <ToolIcon icon={toolDefinition.icon} size="lg" />}
-            <AlertDialogTitle className="text-xl">
-              Disconnect {tool.label}
-            </AlertDialogTitle>
+            <div>
+              <AlertDialogTitle className="text-xl">
+                Disconnect {tool.label}
+              </AlertDialogTitle>
+              {/* Show account label for multi-account clarity */}
+              {tool.accountLabel && (
+                <p className="text-sm text-primary-600 dark:text-primary-400 font-medium">
+                  {tool.accountLabel}
+                </p>
+              )}
+            </div>
           </div>
           <AlertDialogDescription asChild>
             <div className="space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
-                Are you sure you want to disconnect {tool.label}?
+                Are you sure you want to disconnect {displayName}?
               </p>
 
               <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
@@ -58,9 +73,9 @@ export const ToolDisconnectDialog: React.FC<ToolDisconnectDialogProps> = ({
                 <div className="text-sm text-yellow-700 dark:text-yellow-400">
                   <p className="font-medium mb-1">This will:</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Remove the connection to {tool.label}</li>
-                    <li>Revoke access tokens stored for this tool</li>
-                    <li>Stop syncing data from {tool.label}</li>
+                    <li>Remove the connection to {displayName}</li>
+                    <li>Revoke access tokens stored for this account</li>
+                    <li>Stop syncing data from {displayName}</li>
                   </ul>
                 </div>
               </div>

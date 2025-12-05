@@ -54,6 +54,10 @@ export interface UnifiedPullRequest {
   createdAt?: string;
   updatedAt?: string;
   isAuthor?: boolean; // true if current user created this PR, false if they're a reviewer
+  /** External account ID for multi-account support */
+  externalAccountId?: string;
+  /** User-friendly label for multi-account support */
+  accountLabel?: string;
 }
 
 /**

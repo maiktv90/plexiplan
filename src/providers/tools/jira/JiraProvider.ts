@@ -333,7 +333,7 @@ export class JiraProvider implements IToolProvider {
           tasks = tasks.filter(
             (t) =>
               t.title.toLowerCase().includes(searchLower) ||
-              t.description?.toLowerCase().includes(searchLower) ||
+              (typeof t.description === 'string' && t.description.toLowerCase().includes(searchLower)) ||
               t.sourceId.toLowerCase().includes(searchLower) // Also search by issue key
           );
         }

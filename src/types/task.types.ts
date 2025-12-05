@@ -29,7 +29,7 @@ export interface UnifiedTask {
   source: TaskSource;
   sourceId: string; // Original ID from the tool
   title: string;
-  description?: string;
+  description?: string | object; // Can be plain text or ADF (Atlassian Document Format) object
   status: TaskStatus;
   priority?: TaskPriority;
   dueDate?: string;
@@ -52,6 +52,12 @@ export interface UnifiedTask {
   // Timestamps
   createdAt?: string;
   updatedAt?: string;
+
+  // Multi-account support
+  /** External account ID for multi-account support (e.g., Trello user ID) */
+  externalAccountId?: string;
+  /** User-friendly label for multi-account support (e.g., "Work Trello") */
+  accountLabel?: string;
 }
 
 /**

@@ -1,0 +1,19 @@
+# Development Dockerfile for Plexify Planner Frontend (Vite + React)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Clean npm environment to avoid auth issues
+RUN rm -rf /root/.npmrc /root/.npm && \
+    npm cache clean --force && \
+    npm config set registry https://registry.npmjs.org/
+
+# Install dependencies
+COPY package.json ./
+RUN npm install --registry=https://registry.npmjs.org/
+
+# Expose Vite dev server port
+EXPOSE 3000
+
+# Start Vite dev server with host binding for Docker
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]

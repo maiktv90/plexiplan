@@ -110,7 +110,9 @@ export const PullRequestsWidget: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">Pull Requests</h3>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">{openPRs.length} open</span>
+          <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs font-medium rounded-full">
+          {openPRs.length}
+        </span>
           <Button size="sm" variant="ghost" onClick={() => refetch()} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>

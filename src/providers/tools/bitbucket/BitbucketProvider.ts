@@ -204,7 +204,7 @@ export class BitbucketProvider implements IToolProvider {
           tasks = tasks.filter(
             (t) =>
               t.title.toLowerCase().includes(searchLower) ||
-              t.description?.toLowerCase().includes(searchLower)
+              (typeof t.description === 'string' && t.description.toLowerCase().includes(searchLower))
           );
         }
       }

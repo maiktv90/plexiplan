@@ -261,7 +261,7 @@ export class TrelloProvider implements IToolProvider {
           tasks = tasks.filter(
             (t) =>
               t.title.toLowerCase().includes(searchLower) ||
-              t.description?.toLowerCase().includes(searchLower)
+              (typeof t.description === 'string' && t.description.toLowerCase().includes(searchLower))
           );
         }
       }

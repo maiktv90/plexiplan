@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+build
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+.env.local
+
+# npm config (avoid auth issues)
+.npmrc
+
+# Docs and misc
+*.md
+LICENSE
+docs/
+PLAN_*.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+coverage/
+*.test.*
+*.spec.*

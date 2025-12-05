@@ -52,6 +52,8 @@ function transformToUnified(pr: DashboardPullRequest): UnifiedPullRequest {
     createdAt: pr.createdAt,
     updatedAt: pr.updatedAt,
     isAuthor: pr.isAuthor,
+    externalAccountId: pr.externalAccountId,
+    accountLabel: pr.accountLabel,
   };
 }
 

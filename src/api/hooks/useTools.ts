@@ -38,13 +38,23 @@ export const useRegisterPATMutation = () => {
 };
 
 /**
+ * Disconnect request parameters for multi-account support
+ */
+interface DisconnectToolRequest {
+  clientRegistrationId: string;
+  externalAccountId?: string;
+}
+
+/**
  * Mutation hook to disconnect a tool
+ * Supports multi-account disconnect via optional externalAccountId
  */
 export const useDisconnectToolMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (clientRegistrationId: string) => ToolService.disconnectTool(clientRegistrationId),
+    mutationFn: (request: DisconnectToolRequest) =>
+      ToolService.disconnectTool(request.clientRegistrationId, request.externalAccountId),
     onSuccess: () => {
       // Invalidate integrations to refetch connected/available tools
       queryClient.invalidateQueries({ queryKey: TOOL_KEYS.integrations() });
@@ -91,7 +101,15 @@ export const useToolConnect = () => {
 export const useOAuthConnect = useToolConnect;
 
 /**
+ * Generate a unique key for a tool (supports multi-account)
+ */
+const getToolUniqueKey = (clientKey: string, externalAccountId?: string): string => {
+  return externalAccountId ? `${clientKey}:${externalAccountId}` : clientKey;
+};
+
+/**
  * Mutation hook to update tool display order with optimistic updates
+ * Supports multi-account via externalAccountId
  */
 export const useUpdateToolOrderMutation = () => {
   const queryClient = useQueryClient();
@@ -107,16 +125,18 @@ export const useUpdateToolOrderMutation = () => {
       const previousData = queryClient.getQueryData(TOOL_KEYS.integrations());
 
       // Optimistically update the cache
-      queryClient.setQueryData(TOOL_KEYS.integrations(), (old: { connectedTools: Array<{ clientKey: string; order?: number }>; availableTools: unknown[] } | undefined) => {
+      queryClient.setQueryData(TOOL_KEYS.integrations(), (old: { connectedTools: Array<{ clientKey: string; externalAccountId?: string; order?: number }>; availableTools: unknown[] } | undefined) => {
         if (!old) return old;
 
-        // Create a map of clientKey -> new order
-        const orderMap = new Map(request.toolOrders.map(t => [t.clientKey, t.order]));
+        // Create a map of uniqueKey -> new order (supports multi-account)
+        const orderMap = new Map(
+          request.toolOrders.map(t => [getToolUniqueKey(t.clientKey, t.externalAccountId), t.order])
+        );
 
         // Update the order for each connected tool
         const updatedConnectedTools = old.connectedTools.map(tool => ({
           ...tool,
-          order: orderMap.get(tool.clientKey) ?? tool.order,
+          order: orderMap.get(getToolUniqueKey(tool.clientKey, tool.externalAccountId)) ?? tool.order,
         }));
 
         return {

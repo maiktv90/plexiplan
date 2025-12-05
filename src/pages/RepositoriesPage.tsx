@@ -257,18 +257,23 @@ const RepositoryGroup = memo<{
 RepositoryGroup.displayName = 'RepositoryGroup';
 
 /**
- * Collapsible source group for PRs
+ * Collapsible account group for PRs (multi-account support)
+ * Groups PRs by source + externalAccountId, showing account label
+ * Uses persistent state from Zustand store
  */
-const SourceGroup = memo<{
+const AccountGroup = memo<{
+  accountKey: string;
   source: string;
+  accountLabel?: string;
   pullRequests: UnifiedPullRequest[];
-}>(({ source, pullRequests }) => {
+}>(({ accountKey, source, accountLabel, pullRequests }) => {
   const { isSourceExpanded, toggleSource } = useRepositoriesPageStore();
-  const isExpanded = isSourceExpanded(source);
+  // Use accountKey for expand state to support per-account collapse
+  const isExpanded = isSourceExpanded(accountKey);
 
-  const handleToggle = useCallback(() => toggleSource(source), [toggleSource, source]);
+  const handleToggle = useCallback(() => toggleSource(accountKey), [toggleSource, accountKey]);
 
-  // Group PRs by repository within this source
+  // Group PRs by repository within this account
   const groupedByRepo = useMemo(() => {
     const groups: Record<string, { owner: string; repository: string; prs: UnifiedPullRequest[] }> =
       {};
@@ -304,6 +309,11 @@ const SourceGroup = memo<{
     return Object.keys(groupedByRepo).sort((a, b) => a.localeCompare(b));
   }, [groupedByRepo]);
 
+  // Display name: show account label if available, otherwise just source name
+  const displayName = accountLabel
+    ? `${getSourceDisplayName(source)} - ${accountLabel}`
+    : getSourceDisplayName(source);
+
   return (
     <div className={`border-l-2 ${getSourceBorderColor(source)} rounded-r-lg overflow-hidden`}>
       <button
@@ -317,7 +327,10 @@ const SourceGroup = memo<{
             <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           )}
           <span className={`px-2 py-0.5 text-xs rounded ${getSourceBadge(source)}`}>
-            {getSourceDisplayName(source)}
+            {displayName}
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            ({pullRequests.length})
           </span>
         </div>
       </button>
@@ -340,7 +353,7 @@ const SourceGroup = memo<{
     </div>
   );
 });
-SourceGroup.displayName = 'SourceGroup';
+AccountGroup.displayName = 'AccountGroup';
 
 export const RepositoriesPage: React.FC = () => {
   const { data, isLoading, isError, refetch } = usePullRequestsQuery();
@@ -348,42 +361,67 @@ export const RepositoriesPage: React.FC = () => {
 
   const pullRequests = data?.pullRequests || [];
 
-  // Get tool order from connected tools
+  // Get tool order from connected tools settings
+  // Now supports per-account ordering with composite key: "source:externalAccountId"
   const toolOrderMap = useMemo(() => {
     const orderMap = new Map<string, number>();
     if (integrations?.connectedTools) {
       integrations.connectedTools.forEach((tool) => {
         // Map clientKey to source name (e.g., 'github-oauth' -> 'github')
         const source = tool.clientKey.replace(/-oauth$/, '').replace(/-pat$/, '');
-        orderMap.set(source, tool.order ?? 999);
+        // For multi-account support, use composite key: "source:externalAccountId"
+        if (tool.externalAccountId) {
+          orderMap.set(`${source}:${tool.externalAccountId}`, tool.order ?? 999);
+        }
+        // Also set source-level order (fallback for PRs without externalAccountId)
+        // Use the minimum order among accounts for this source
+        const currentSourceOrder = orderMap.get(source);
+        if (currentSourceOrder === undefined || (tool.order ?? 999) < currentSourceOrder) {
+          orderMap.set(source, tool.order ?? 999);
+        }
       });
     }
     return orderMap;
   }, [integrations?.connectedTools]);
 
-  // Group PRs by source
-  const groupedBySource = useMemo(() => {
-    const groups: Record<string, UnifiedPullRequest[]> = {};
+  // Group PRs by account (source + externalAccountId for multi-account support)
+  // Key format: "source:externalAccountId" or just "source" for legacy PRs
+  const groupedByAccount = useMemo(() => {
+    const groups: Record<string, { source: string; accountLabel?: string; externalAccountId?: string; prs: UnifiedPullRequest[] }> = {};
 
     for (const pr of pullRequests) {
-      if (!groups[pr.source]) {
-        groups[pr.source] = [];
+      // Use composite key for multi-account support
+      const accountKey = pr.externalAccountId
+        ? `${pr.source}:${pr.externalAccountId}`
+        : pr.source;
+
+      if (!groups[accountKey]) {
+        groups[accountKey] = {
+          source: pr.source,
+          accountLabel: pr.accountLabel,
+          externalAccountId: pr.externalAccountId,
+          prs: [],
+        };
       }
-      groups[pr.source].push(pr);
+      groups[accountKey].prs.push(pr);
     }
 
     return groups;
   }, [pullRequests]);
 
-  // Sort sources by configured tool order, then alphabetically for unconfigured
-  const sortedSources = useMemo(() => {
-    return Object.keys(groupedBySource).sort((a, b) => {
-      const aOrder = toolOrderMap.get(a) ?? 999;
-      const bOrder = toolOrderMap.get(b) ?? 999;
+  // Sort accounts by configured tool order, then alphabetically
+  const sortedAccountKeys = useMemo(() => {
+    return Object.keys(groupedByAccount).sort((a, b) => {
+      // Try composite key first (for multi-account), then fall back to source-only key
+      const aOrder = toolOrderMap.get(a) ?? toolOrderMap.get(groupedByAccount[a].source) ?? 999;
+      const bOrder = toolOrderMap.get(b) ?? toolOrderMap.get(groupedByAccount[b].source) ?? 999;
       if (aOrder !== bOrder) return aOrder - bOrder;
-      return a.localeCompare(b);
+      // Secondary sort by account label
+      const aLabel = groupedByAccount[a].accountLabel ?? a;
+      const bLabel = groupedByAccount[b].accountLabel ?? b;
+      return aLabel.localeCompare(bLabel);
     });
-  }, [groupedBySource, toolOrderMap]);
+  }, [groupedByAccount, toolOrderMap]);
 
   const handleRefresh = useCallback(() => refetch(), [refetch]);
 
@@ -435,13 +473,18 @@ export const RepositoriesPage: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {sortedSources.map((source) => (
-              <SourceGroup
-                key={source}
-                source={source}
-                pullRequests={groupedBySource[source]}
-              />
-            ))}
+            {sortedAccountKeys.map((accountKey) => {
+              const account = groupedByAccount[accountKey];
+              return (
+                <AccountGroup
+                  key={accountKey}
+                  accountKey={accountKey}
+                  source={account.source}
+                  accountLabel={account.accountLabel}
+                  pullRequests={account.prs}
+                />
+              );
+            })}
           </div>
         )}
       </div>

@@ -67,6 +67,12 @@ export const ToolCard: React.FC<ToolCardProps> = ({
             <h3 className="font-semibold text-gray-900 dark:text-white">
               {tool.name}
             </h3>
+            {/* Show account label for multi-account support */}
+            {isConnected && connectedTool.accountLabel && (
+              <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">
+                {connectedTool.accountLabel}
+              </p>
+            )}
             <ToolStatusBadge status={status} size="sm" />
           </div>
         </div>

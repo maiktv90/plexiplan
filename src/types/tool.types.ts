@@ -50,6 +50,17 @@ export interface ConnectedTool {
   connectedAt?: string; // ISO timestamp
   updatedAt?: string; // ISO timestamp
   order?: number; // Display order for custom sorting
+  /**
+   * The external provider's unique identifier for this account.
+   * Used to distinguish between multiple accounts from the same provider.
+   * e.g., GitHub user ID, Bitbucket account_id, Jira account_id
+   */
+  externalAccountId?: string;
+  /**
+   * User-friendly label for this account connection.
+   * e.g., "Work GitHub", "Personal GitHub"
+   */
+  accountLabel?: string;
 }
 
 /**
@@ -150,7 +161,12 @@ export interface ToolDisconnectDialogProps {
   toolDefinition: ToolDefinition;
   isOpen: boolean;
   onClose: () => void;
-  onDisconnect: (clientKey: string) => void;
+  /**
+   * Disconnect a specific account.
+   * @param clientKey The provider identifier (e.g., "github")
+   * @param externalAccountId Optional external account ID for multi-account support
+   */
+  onDisconnect: (clientKey: string, externalAccountId?: string) => void;
   isDisconnecting?: boolean;
 }
 
@@ -164,7 +180,20 @@ export interface UpdateToolOrderRequest {
 export interface ToolOrderUpdate {
   clientKey: string;
   order: number;
+  externalAccountId?: string; // For multi-account support
 }
+
+/**
+ * Helper type to group connected tools by provider
+ */
+export interface ToolsByProvider {
+  [clientKey: string]: ConnectedTool[];
+}
+
+/**
+ * Helper function type signature for grouping tools
+ */
+export type GroupToolsByProvider = (tools: ConnectedTool[]) => ToolsByProvider;
 
 /**
  * Response from tool order update

@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { BoardMultiSelect } from '@/components/features/tasks/BoardMultiSelect';
+import { TaskDetailSheet } from '@/components/features/tasks/TaskDetailSheet';
 import type { UnifiedTask, UnifiedBoard, TaskSource, TaskStatus } from '@/types/task.types';
 
 /** Threshold for enabling virtualization (number of tasks) */
@@ -148,9 +149,24 @@ const TaskListItem = memo<{
   task: UnifiedTask;
   showBoardName?: boolean;
   showSource?: boolean;
-}>(({ task, showBoardName = true, showSource = true }) => {
+  onClick?: (task: UnifiedTask) => void;
+}>(({ task, showBoardName = true, showSource = true, onClick }) => {
+  const handleClick = useCallback(() => {
+    onClick?.(task);
+  }, [onClick, task]);
+
+  const handleExternalLinkClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   return (
-    <div className="flex items-start gap-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow">
+    <div
+      onClick={handleClick}
+      className={`flex items-start gap-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer' : ''}`}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } } : undefined}
+    >
       <StatusIcon status={task.status} size="md" />
 
       <div className="flex-1 min-w-0">
@@ -176,12 +192,6 @@ const TaskListItem = memo<{
             </>
           )}
         </div>
-
-        {task.description && (
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-            {task.description}
-          </p>
-        )}
 
         {/* Labels */}
         {task.labels && task.labels.length > 0 && (
@@ -222,7 +232,9 @@ const TaskListItem = memo<{
           href={task.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-shrink-0 p-2 text-gray-400 hover:text-primary-500 transition-colors"
+          onClick={handleExternalLinkClick}
+          className="flex-shrink-0 p-2 text-gray-400 hover:text-primary-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+          title="Open in external tool"
         >
           <ExternalLink className="w-5 h-5" />
         </a>
@@ -239,7 +251,8 @@ const VirtualizedTaskList = memo<{
   tasks: UnifiedTask[];
   showBoardName?: boolean;
   showSource?: boolean;
-}>(({ tasks, showBoardName = true, showSource = true }) => {
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ tasks, showBoardName = true, showSource = true, onTaskClick }) => {
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -278,7 +291,7 @@ const VirtualizedTaskList = memo<{
                 paddingBottom: '12px',
               }}
             >
-              <TaskListItem task={task} showBoardName={showBoardName} showSource={showSource} />
+              <TaskListItem task={task} showBoardName={showBoardName} showSource={showSource} onClick={onTaskClick} />
             </div>
           );
         })}
@@ -295,7 +308,8 @@ const StandardTaskList = memo<{
   tasks: UnifiedTask[];
   showBoardName?: boolean;
   showSource?: boolean;
-}>(({ tasks, showBoardName = true, showSource = true }) => (
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ tasks, showBoardName = true, showSource = true, onTaskClick }) => (
   <div className="space-y-3">
     {tasks.map((task) => (
       <TaskListItem
@@ -303,6 +317,7 @@ const StandardTaskList = memo<{
         task={task}
         showBoardName={showBoardName}
         showSource={showSource}
+        onClick={onTaskClick}
       />
     ))}
   </div>
@@ -312,13 +327,22 @@ StandardTaskList.displayName = 'StandardTaskList';
 /**
  * Compact task card for Kanban board view
  */
-const KanbanTaskCard = memo<{ task: UnifiedTask }>(({ task }) => {
+const KanbanTaskCard = memo<{ task: UnifiedTask; onClick?: (task: UnifiedTask) => void }>(({ task, onClick }) => {
+  const handleClick = useCallback(() => {
+    onClick?.(task);
+  }, [onClick, task]);
+
+  const handleExternalLinkClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   return (
-    <a
-      href={task.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow group"
+    <div
+      onClick={handleClick}
+      className={`block p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow group ${onClick ? 'cursor-pointer' : ''}`}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } } : undefined}
     >
       <div className="flex items-start gap-2">
         <StatusIcon status={task.status} size="sm" />
@@ -357,9 +381,20 @@ const KanbanTaskCard = memo<{ task: UnifiedTask }>(({ task }) => {
             </div>
           )}
         </div>
-        <ExternalLink className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+        {task.url && (
+          <a
+            href={task.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleExternalLinkClick}
+            className="w-5 h-5 flex items-center justify-center text-gray-400 opacity-0 group-hover:opacity-100 hover:text-primary-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-all flex-shrink-0"
+            title="Open in external tool"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
       </div>
-    </a>
+    </div>
   );
 });
 KanbanTaskCard.displayName = 'KanbanTaskCard';
@@ -370,7 +405,8 @@ KanbanTaskCard.displayName = 'KanbanTaskCard';
 const BoardColumn = memo<{
   boardName: string;
   tasks: UnifiedTask[];
-}>(({ boardName, tasks }) => {
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ boardName, tasks, onTaskClick }) => {
   return (
     <div className="flex-shrink-0 w-[280px] flex flex-col bg-gray-100 dark:bg-gray-800/50 rounded-lg">
       {/* Column Header */}
@@ -388,7 +424,7 @@ const BoardColumn = memo<{
         {tasks.length === 0 ? (
           <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No tasks</p>
         ) : (
-          tasks.map((task) => <KanbanTaskCard key={task.id} task={task} />)
+          tasks.map((task) => <KanbanTaskCard key={task.id} task={task} onClick={onTaskClick} />)
         )}
       </div>
     </div>
@@ -402,7 +438,8 @@ BoardColumn.displayName = 'BoardColumn';
 const ToolRow = memo<{
   source: TaskSource;
   tasks: UnifiedTask[];
-}>(({ source, tasks }) => {
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ source, tasks, onTaskClick }) => {
   // Group tasks by board
   const tasksByBoard = useMemo(() => {
     const groups: Record<string, { boardName: string; tasks: UnifiedTask[] }> = {};
@@ -446,6 +483,7 @@ const ToolRow = memo<{
                 key={boardKey}
                 boardName={boardName}
                 tasks={boardTasks}
+                onTaskClick={onTaskClick}
               />
             );
           })}
@@ -462,7 +500,8 @@ ToolRow.displayName = 'ToolRow';
 const BoardView = memo<{
   tasks: UnifiedTask[];
   toolOrderMap: Map<string, number>;
-}>(({ tasks, toolOrderMap }) => {
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ tasks, toolOrderMap, onTaskClick }) => {
   // Group tasks by source
   const tasksBySource = useMemo(() => {
     const groups: Record<string, UnifiedTask[]> = {};
@@ -494,6 +533,7 @@ const BoardView = memo<{
           key={source}
           source={source}
           tasks={tasksBySource[source]}
+          onTaskClick={onTaskClick}
         />
       ))}
     </div>
@@ -509,7 +549,8 @@ const BoardGroup = memo<{
   boardKey: string;
   boardName: string;
   tasks: UnifiedTask[];
-}>(({ boardKey, boardName, tasks }) => {
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ boardKey, boardName, tasks, onTaskClick }) => {
   const { isBoardExpanded, toggleBoard } = useTasksPageStore();
   const isExpanded = isBoardExpanded(boardKey);
 
@@ -541,9 +582,9 @@ const BoardGroup = memo<{
       {isExpanded && (
         <div className="p-2 bg-gray-50 dark:bg-gray-800">
           {useVirtualization ? (
-            <VirtualizedTaskList tasks={tasks} showBoardName={false} showSource={false} />
+            <VirtualizedTaskList tasks={tasks} showBoardName={false} showSource={false} onTaskClick={onTaskClick} />
           ) : (
-            <StandardTaskList tasks={tasks} showBoardName={false} showSource={false} />
+            <StandardTaskList tasks={tasks} showBoardName={false} showSource={false} onTaskClick={onTaskClick} />
           )}
         </div>
       )}
@@ -559,7 +600,8 @@ BoardGroup.displayName = 'BoardGroup';
 const SourceGroup = memo<{
   source: TaskSource;
   tasks: UnifiedTask[];
-}>(({ source, tasks }) => {
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ source, tasks, onTaskClick }) => {
   const { isSourceExpanded, toggleSource } = useTasksPageStore();
   const isExpanded = isSourceExpanded(source);
 
@@ -619,6 +661,7 @@ const SourceGroup = memo<{
                 boardKey={boardKey}
                 boardName={boardName}
                 tasks={boardTasks}
+                onTaskClick={onTaskClick}
               />
             );
           })}
@@ -628,6 +671,97 @@ const SourceGroup = memo<{
   );
 });
 SourceGroup.displayName = 'SourceGroup';
+
+/**
+ * Collapsible account group for tasks (multi-account support)
+ * Groups tasks by source + externalAccountId, showing account label
+ * Uses persistent state from Zustand store
+ */
+const AccountGroup = memo<{
+  accountKey: string;
+  source: TaskSource;
+  accountLabel?: string;
+  tasks: UnifiedTask[];
+  onTaskClick?: (task: UnifiedTask) => void;
+}>(({ accountKey, source, accountLabel, tasks, onTaskClick }) => {
+  const { isSourceExpanded, toggleSource } = useTasksPageStore();
+  // Use accountKey for expand state to support per-account collapse
+  const isExpanded = isSourceExpanded(accountKey);
+
+  const handleToggle = useCallback(() => toggleSource(accountKey), [toggleSource, accountKey]);
+
+  // Group tasks by board within this account
+  const groupedByBoard = useMemo(() => {
+    const groups: Record<string, { boardKey: string; boardName: string; tasks: UnifiedTask[] }> =
+      {};
+
+    for (const task of tasks) {
+      const boardKey = `${task.source}-${task.boardId}`;
+      if (!groups[boardKey]) {
+        groups[boardKey] = {
+          boardKey,
+          boardName: task.boardName || 'Unknown Board',
+          tasks: [],
+        };
+      }
+      groups[boardKey].tasks.push(task);
+    }
+
+    return groups;
+  }, [tasks]);
+
+  // Sort boards alphabetically
+  const sortedBoardKeys = useMemo(() => {
+    return Object.keys(groupedByBoard).sort((a, b) =>
+      groupedByBoard[a].boardName.localeCompare(groupedByBoard[b].boardName)
+    );
+  }, [groupedByBoard]);
+
+  // Display name: show account label if available, otherwise just source name
+  const displayName = accountLabel
+    ? `${getSourceDisplayName(source)} - ${accountLabel}`
+    : getSourceDisplayName(source);
+
+  return (
+    <div className={`border-l-2 ${getSourceBorderColor(source)} rounded-r-lg overflow-hidden`}>
+      <button
+        onClick={handleToggle}
+        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          )}
+          <span className={`px-2 py-0.5 text-xs rounded ${getSourceBadgeClass(source)}`}>
+            {displayName}
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            ({tasks.length})
+          </span>
+        </div>
+      </button>
+      {isExpanded && (
+        <div className="p-3 space-y-3 bg-gray-50/50 dark:bg-gray-900/50">
+          {sortedBoardKeys.map((boardKey) => {
+            const { boardName, tasks: boardTasks } = groupedByBoard[boardKey];
+            return (
+              <BoardGroup
+                key={boardKey}
+                boardKey={boardKey}
+                boardName={boardName}
+                tasks={boardTasks}
+                onTaskClick={onTaskClick}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+});
+AccountGroup.displayName = 'AccountGroup';
 
 const STORAGE_KEY_SELECTED_BOARDS = 'plexify-tasks-selected-boards';
 const STORAGE_KEY_STATUS_FILTER = 'plexify-tasks-status-filter';
@@ -654,6 +788,10 @@ export const TasksPage: React.FC = () => {
       return 'todo';
     }
   });
+
+  // Task detail sheet state
+  const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   // Persist to localStorage via useEffect (non-blocking)
   useEffect(() => {
@@ -684,6 +822,19 @@ export const TasksPage: React.FC = () => {
   const handleViewModeList = useCallback(() => setViewMode('list'), []);
   const handleViewModeBoard = useCallback(() => setViewMode('board'), []);
 
+  // Handler for opening task detail sheet
+  const handleTaskClick = useCallback((task: UnifiedTask) => {
+    setSelectedTask(task);
+    setIsDetailSheetOpen(true);
+  }, []);
+
+  const handleDetailSheetOpenChange = useCallback((open: boolean) => {
+    setIsDetailSheetOpen(open);
+    if (!open) {
+      setSelectedTask(null);
+    }
+  }, []);
+
   // Use dashboard endpoint with status filter for server-side filtering
   // This single API call replaces the slow useUnifiedBoardsQuery
   const {
@@ -698,13 +849,23 @@ export const TasksPage: React.FC = () => {
   const handleRefresh = useCallback(() => refetchTasks(), [refetchTasks]);
 
   // Get tool order from connected tools settings
+  // Now supports per-account ordering with composite key: "source:externalAccountId"
   const toolOrderMap = useMemo(() => {
     const orderMap = new Map<string, number>();
     if (integrations?.connectedTools) {
       integrations.connectedTools.forEach((tool) => {
         // Map clientKey to source name (e.g., 'jira-oauth' -> 'jira', 'trello-pat' -> 'trello')
         const source = tool.clientKey.replace(/-oauth$/, '').replace(/-pat$/, '');
-        orderMap.set(source, tool.order ?? 999);
+        // For multi-account support, use composite key: "source:externalAccountId"
+        if (tool.externalAccountId) {
+          orderMap.set(`${source}:${tool.externalAccountId}`, tool.order ?? 999);
+        }
+        // Also set source-level order (fallback for tasks without externalAccountId)
+        // Use the minimum order among accounts for this source
+        const currentSourceOrder = orderMap.get(source);
+        if (currentSourceOrder === undefined || (tool.order ?? 999) < currentSourceOrder) {
+          orderMap.set(source, tool.order ?? 999);
+        }
       });
     }
     return orderMap;
@@ -730,6 +891,8 @@ export const TasksPage: React.FC = () => {
         labels: t.labels?.map((l) => ({ id: l.id, name: l.name, color: l.color })),
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
+        externalAccountId: t.externalAccountId,
+        accountLabel: t.accountLabel,
       })),
     [dashboardData?.tasks]
   );
@@ -783,29 +946,44 @@ export const TasksPage: React.FC = () => {
     return tasks.filter((t) => selectedBoardIdSet.has(`${t.source}-${t.boardId}`));
   }, [tasks, isAllBoardsSelected, selectedBoardIdSet, isNoneSelected]);
 
-  // Group tasks by source
-  const groupedBySource = useMemo(() => {
-    const groups: Record<string, UnifiedTask[]> = {};
+  // Group tasks by account (source + externalAccountId for multi-account support)
+  // Key format: "source:externalAccountId" or just "source" for legacy tasks
+  const groupedByAccount = useMemo(() => {
+    const groups: Record<string, { source: TaskSource; accountLabel?: string; externalAccountId?: string; tasks: UnifiedTask[] }> = {};
 
     for (const task of filteredTasks) {
-      if (!groups[task.source]) {
-        groups[task.source] = [];
+      // Use composite key for multi-account support
+      const accountKey = task.externalAccountId
+        ? `${task.source}:${task.externalAccountId}`
+        : task.source;
+
+      if (!groups[accountKey]) {
+        groups[accountKey] = {
+          source: task.source,
+          accountLabel: task.accountLabel,
+          externalAccountId: task.externalAccountId,
+          tasks: [],
+        };
       }
-      groups[task.source].push(task);
+      groups[accountKey].tasks.push(task);
     }
 
     return groups;
   }, [filteredTasks]);
 
-  // Sort sources by configured tool order, then alphabetically
-  const sortedSources = useMemo(() => {
-    return Object.keys(groupedBySource).sort((a, b) => {
-      const aOrder = toolOrderMap.get(a) ?? 999;
-      const bOrder = toolOrderMap.get(b) ?? 999;
+  // Sort accounts by configured tool order, then alphabetically
+  const sortedAccountKeys = useMemo(() => {
+    return Object.keys(groupedByAccount).sort((a, b) => {
+      // Try composite key first (for multi-account), then fall back to source-only key
+      const aOrder = toolOrderMap.get(a) ?? toolOrderMap.get(groupedByAccount[a].source) ?? 999;
+      const bOrder = toolOrderMap.get(b) ?? toolOrderMap.get(groupedByAccount[b].source) ?? 999;
       if (aOrder !== bOrder) return aOrder - bOrder;
-      return a.localeCompare(b);
-    }) as TaskSource[];
-  }, [groupedBySource, toolOrderMap]);
+      // Secondary sort by account label
+      const aLabel = groupedByAccount[a].accountLabel ?? a;
+      const bLabel = groupedByAccount[b].accountLabel ?? b;
+      return aLabel.localeCompare(bLabel);
+    });
+  }, [groupedByAccount, toolOrderMap]);
 
   // Determine if we should show grouped view
   const showGroupedView = isAllBoardsSelected || selectedBoardIds.length > 1;
@@ -905,27 +1083,40 @@ export const TasksPage: React.FC = () => {
             </div>
           ) : viewMode === 'board' ? (
             // Board view: tools as rows, boards as columns with task cards
-            <BoardView tasks={filteredTasks} toolOrderMap={toolOrderMap} />
+            <BoardView tasks={filteredTasks} toolOrderMap={toolOrderMap} onTaskClick={handleTaskClick} />
           ) : showGroupedView ? (
-            // Grouped view: Source → Board → Tasks (same as PR page)
+            // Grouped view: Account → Board → Tasks (supports multi-account ordering)
             <div className="space-y-4">
-              {sortedSources.map((source) => (
-                <SourceGroup
-                  key={source}
-                  source={source}
-                  tasks={groupedBySource[source]}
-                />
-              ))}
+              {sortedAccountKeys.map((accountKey) => {
+                const account = groupedByAccount[accountKey];
+                return (
+                  <AccountGroup
+                    key={accountKey}
+                    accountKey={accountKey}
+                    source={account.source}
+                    accountLabel={account.accountLabel}
+                    tasks={account.tasks}
+                    onTaskClick={handleTaskClick}
+                  />
+                );
+              })}
             </div>
           ) : useVirtualization ? (
             // Virtualized flat list for large datasets
-            <VirtualizedTaskList tasks={filteredTasks} />
+            <VirtualizedTaskList tasks={filteredTasks} onTaskClick={handleTaskClick} />
           ) : (
             // Standard flat list for small datasets
-            <StandardTaskList tasks={filteredTasks} />
+            <StandardTaskList tasks={filteredTasks} onTaskClick={handleTaskClick} />
           )}
         </section>
       </div>
+
+      {/* Task Detail Sheet */}
+      <TaskDetailSheet
+        task={selectedTask}
+        open={isDetailSheetOpen}
+        onOpenChange={handleDetailSheetOpenChange}
+      />
     </div>
   );
 };

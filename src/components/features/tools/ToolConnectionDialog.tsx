@@ -52,6 +52,7 @@ export const ToolConnectionDialog: React.FC<ToolConnectionDialogProps> = ({
       // Standard OAuth2 - redirect to auth provider
       onConnectOAuth();
     } else if (isCustom) {
+      console.log({connectUrl})
       // Custom flow (Trello) - redirect to auth page
       // Trello uses fragment callback which redirects back to /auth/trello/callback#token=xxx
       // Full page navigation is required (not popup) for fragment callback to work

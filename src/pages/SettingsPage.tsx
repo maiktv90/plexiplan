@@ -118,10 +118,10 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleConfirmDisconnect = async (clientKey: string) => {
+  const handleConfirmDisconnect = async (clientKey: string, externalAccountId?: string) => {
     setToolLoading(clientKey, true);
     try {
-      await disconnectMutation.mutateAsync(clientKey);
+      await disconnectMutation.mutateAsync({ clientRegistrationId: clientKey, externalAccountId });
       closeDisconnectDialog();
     } catch (err) {
       setToolError(
@@ -185,6 +185,7 @@ export const SettingsPage: React.FC = () => {
     const toolOrders = reorderedTools.map((tool, index) => ({
       clientKey: tool.clientKey,
       order: index,
+      externalAccountId: tool.externalAccountId, // Include for multi-account support
     }));
 
     try {

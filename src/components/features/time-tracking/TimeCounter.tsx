@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DateTime } from 'luxon';
-import { theme } from './styles.tracking';
+import { theme }    from '@/components';
 
 interface TimeCounterProps {
   startTime?: string;
