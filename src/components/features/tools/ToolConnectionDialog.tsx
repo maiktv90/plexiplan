@@ -38,6 +38,7 @@ export const ToolConnectionDialog: React.FC<ToolConnectionDialogProps> = ({
   const [patCredentials, setPatCredentials] = useState<PATCredentials>({
     token: '',
     domain: '',
+    username: '',
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -76,7 +77,7 @@ export const ToolConnectionDialog: React.FC<ToolConnectionDialogProps> = ({
   };
 
   const handleClose = () => {
-    setPatCredentials({ token: '', domain: '' });
+    setPatCredentials({ token: '', domain: '', username: '' });
     setValidationError(null);
     onClose();
   };

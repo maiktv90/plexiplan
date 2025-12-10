@@ -6,6 +6,8 @@ export interface ApiResponse<T = unknown> {
   data: T;
   success: boolean;
   error?: string;
+  code?: string;  // Error code from backend (e.g., 'RECONNECT_REQUIRED')
+  provider?: string;  // Provider that needs reconnection
   message?: string;
 }
 
@@ -143,20 +145,28 @@ export class ApiClient {
     if (axios.isAxiosError(error)) {
       if (error.response) {
         const status = error.response.status;
-        let errorMessage = error.response.data?.message || error.response.statusText || 'An error occurred';
-        
+        const responseData = error.response.data;
+        let errorMessage = responseData?.message || error.response.statusText || 'An error occurred';
+
         // Handle specific status codes
         if (status === 404) {
           errorMessage = `404: ${errorMessage}`;
         } else if (status === 401) {
-          errorMessage = 'Authentication required. Please log in again.';
+          // Check if this is a token refresh failure that requires reconnection
+          if (responseData?.code === 'RECONNECT_REQUIRED') {
+            errorMessage = responseData.message || `Please reconnect your ${responseData.provider || 'account'}`;
+          } else {
+            errorMessage = 'Authentication required. Please log in again.';
+          }
         }
-        
+
         return {
           data: null,
           success: false,
           error: errorMessage,
-          message: error.response.data?.message,
+          code: responseData?.code,
+          provider: responseData?.provider,
+          message: responseData?.message,
         };
       } else if (error.request) {
         return {

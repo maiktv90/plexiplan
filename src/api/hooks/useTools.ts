@@ -42,12 +42,12 @@ export const useRegisterPATMutation = () => {
  */
 interface DisconnectToolRequest {
   clientRegistrationId: string;
-  externalAccountId?: string;
+  externalAccountId: string; // Required for multi-account support
 }
 
 /**
  * Mutation hook to disconnect a tool
- * Supports multi-account disconnect via optional externalAccountId
+ * Requires externalAccountId to support multi-account disconnect
  */
 export const useDisconnectToolMutation = () => {
   const queryClient = useQueryClient();

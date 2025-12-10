@@ -73,16 +73,13 @@ export const ToolService = {
 
   /**
    * Disconnect a tool (delete PAT or OAuth token)
-   * DELETE /planner/api/v1/tools/pat/{clientRegistrationId}?externalAccountId={externalAccountId}
+   * DELETE /planner/api/v1/tools/pat/{clientRegistrationId}/{externalAccountId}
    *
    * @param clientRegistrationId The provider identifier (e.g., "github", "bitbucket")
-   * @param externalAccountId Optional external account ID for multi-account disconnect
+   * @param externalAccountId External account ID to disconnect (required for multi-account support)
    */
-  async disconnectTool(clientRegistrationId: string, externalAccountId?: string): Promise<void> {
-    const params = externalAccountId
-      ? `?externalAccountId=${encodeURIComponent(externalAccountId)}`
-      : '';
-    await toolsApiClient.delete(`/pat/${clientRegistrationId}${params}`);
+  async disconnectTool(clientRegistrationId: string, externalAccountId: string): Promise<void> {
+    await toolsApiClient.delete(`/pat/${clientRegistrationId}/${encodeURIComponent(externalAccountId)}`);
   },
 
   /**

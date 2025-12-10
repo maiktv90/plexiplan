@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
-export type ToastType = 'success' | 'error' | 'info' | 'warning';
+export type ToastType = 'success' | 'error' | 'info' | 'warning' | 'reconnect';
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 export interface Toast {
   id: string;
@@ -9,6 +14,8 @@ export interface Toast {
   title: string;
   message?: string;
   duration?: number;
+  action?: ToastAction;
+  provider?: string;  // For reconnect toasts
 }
 
 interface ToastState {
@@ -68,4 +75,19 @@ export const toast = {
     useToastStore.getState().addToast({ type: 'info', title, message }),
   warning: (title: string, message?: string) =>
     useToastStore.getState().addToast({ type: 'warning', title, message }),
+  /**
+   * Show a reconnect toast with an action button to go to settings
+   */
+  reconnect: (provider: string, onReconnect?: () => void) =>
+    useToastStore.getState().addToast({
+      type: 'reconnect',
+      title: `${provider} connection expired`,
+      message: 'Your session has expired. Please reconnect to continue.',
+      duration: 0, // Don't auto-dismiss
+      provider,
+      action: onReconnect ? {
+        label: 'Reconnect',
+        onClick: onReconnect,
+      } : undefined,
+    }),
 };

@@ -121,6 +121,7 @@ export interface ToolConnectionDialogProps {
 export interface PATCredentials {
   token: string;
   domain?: string;
+  username?: string; // For providers that require username:token format (e.g., Bitbucket App Password)
 }
 
 /**

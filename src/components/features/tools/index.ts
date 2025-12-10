@@ -7,5 +7,6 @@ export * from './SortableConnectedToolListItem';
 export * from './ToolList';
 export * from './ToolConnectionDialog';
 export * from './ToolDisconnectDialog';
+export * from './AccountSwitchDialog';
 export * from './JiraProjectConfigDialog';
 export * from './BitbucketRepoConfigDialog';

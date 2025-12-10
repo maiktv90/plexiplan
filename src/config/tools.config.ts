@@ -21,11 +21,31 @@ export const SUPPORTED_TOOLS: ToolDefinition[] = [
     id: 'bitbucket',
     clientRegistrationId: 'bitbucket',
     name: 'Bitbucket',
-    description: 'Connect your Bitbucket repositories and pull requests',
+    description: 'Connect via OAuth (tokens expire in 2 hours, auto-refresh)',
     icon: 'bitbucket',
     category: 'code_management',
     authMethod: 'OAUTH2',
     docsUrl: 'https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/',
+  },
+  {
+    id: 'bitbucket-pat',
+    clientRegistrationId: 'bitbucket-pat',
+    name: 'Bitbucket (API Token)',
+    description: 'Connect via API Token (tokens never expire)',
+    icon: 'bitbucket',
+    category: 'code_management',
+    authMethod: 'PAT',
+    configFields: [
+      {
+        key: 'token',
+        label: 'API Token',
+        type: 'password',
+        required: true,
+        placeholder: 'Enter your API token',
+        helpText: 'Create one at bitbucket.org/account/settings/api-tokens/',
+      },
+    ],
+    docsUrl: 'https://support.atlassian.com/bitbucket-cloud/docs/api-tokens/',
   },
 
   // Project Management Tools

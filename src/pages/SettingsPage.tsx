@@ -6,6 +6,7 @@ import {
   ToolList,
   ToolConnectionDialog,
   ToolDisconnectDialog,
+  AccountSwitchDialog,
   JiraProjectConfigDialog,
   BitbucketRepoConfigDialog,
 } from '@/components/features/tools';
@@ -55,11 +56,17 @@ export const SettingsPage: React.FC = () => {
     connectingTool,
     connectingToolUrl,
     isConnectionDialogOpen,
+    isAccountSwitchDialogOpen,
+    accountSwitchTool,
+    accountSwitchLogoutUrl,
     disconnectingTool,
     isDisconnectDialogOpen,
     toolLoadingStates,
     openConnectionDialog,
     closeConnectionDialog,
+    openAccountSwitchDialog,
+    closeAccountSwitchDialog,
+    proceedAfterAccountSwitch,
     openDisconnectDialog,
     closeDisconnectDialog,
     setToolLoading,
@@ -67,9 +74,29 @@ export const SettingsPage: React.FC = () => {
     toolErrors,
   } = useToolStore();
 
+  // Providers that don't support account selection during OAuth
+  // These require the user to sign out first to connect a different account
+  const PROVIDERS_REQUIRING_SIGNOUT: Record<string, string> = {
+    bitbucket: 'https://bitbucket.org/account/signout/',
+    github: 'https://github.com/logout',
+  };
+
   // Handlers
   const handleConnect = (tool: ToolDefinition, connectUrl?: string) => {
-    openConnectionDialog(tool, connectUrl);
+    // Check if user already has an account connected for this provider
+    const existingAccounts = integrations?.connectedTools.filter(
+      (ct) => ct.clientKey === tool.clientRegistrationId
+    ) ?? [];
+
+    // If adding another account for a provider that doesn't support account selection
+    const logoutUrl = PROVIDERS_REQUIRING_SIGNOUT[tool.clientRegistrationId];
+    if (existingAccounts.length > 0 && logoutUrl && tool.authMethod === 'OAUTH2') {
+      // Show account switch dialog instead of direct connection
+      openAccountSwitchDialog(tool, logoutUrl);
+    } else {
+      // Normal connection flow
+      openConnectionDialog(tool, connectUrl);
+    }
   };
 
   const handleDisconnect = (tool: ConnectedTool) => {
@@ -102,9 +129,15 @@ export const SettingsPage: React.FC = () => {
   const handlePATConnect = async (tool: ToolDefinition, credentials: PATCredentials) => {
     setToolLoading(tool.clientRegistrationId, true);
     try {
+      // For Bitbucket App Password, combine username and token into "username:token" format
+      let token = credentials.token;
+      if (tool.clientRegistrationId === 'bitbucket-pat' && credentials.username) {
+        token = `${credentials.username}:${credentials.token}`;
+      }
+
       await registerPATMutation.mutateAsync({
         client: tool.clientRegistrationId,
-        token: credentials.token,
+        token,
         domain: credentials.domain,
       });
       closeConnectionDialog();
@@ -324,6 +357,14 @@ export const SettingsPage: React.FC = () => {
         isDisconnecting={
           disconnectingTool ? toolLoadingStates[disconnectingTool.clientKey] : false
         }
+      />
+
+      <AccountSwitchDialog
+        tool={accountSwitchTool}
+        logoutUrl={accountSwitchLogoutUrl}
+        isOpen={isAccountSwitchDialogOpen}
+        onClose={closeAccountSwitchDialog}
+        onProceed={proceedAfterAccountSwitch}
       />
 
       <JiraProjectConfigDialog

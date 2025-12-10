@@ -8,6 +8,11 @@ interface ToolState {
   connectingToolUrl: string | null; // URL from backend to initiate connection
   isConnectionDialogOpen: boolean;
 
+  // Account switch dialog state (for providers that don't support prompt=consent)
+  isAccountSwitchDialogOpen: boolean;
+  accountSwitchTool: ToolDefinition | null;
+  accountSwitchLogoutUrl: string | null;
+
   // Disconnect dialog state
   disconnectingTool: ConnectedTool | null;
   isDisconnectDialogOpen: boolean;
@@ -22,6 +27,11 @@ interface ToolState {
   openConnectionDialog: (tool: ToolDefinition, connectUrl?: string) => void;
   closeConnectionDialog: () => void;
 
+  // Actions - Account switch dialog
+  openAccountSwitchDialog: (tool: ToolDefinition, logoutUrl: string) => void;
+  closeAccountSwitchDialog: () => void;
+  proceedAfterAccountSwitch: () => void;
+
   // Actions - Disconnect dialog
   openDisconnectDialog: (tool: ConnectedTool) => void;
   closeDisconnectDialog: () => void;
@@ -35,11 +45,14 @@ interface ToolState {
 
 export const useToolStore = create<ToolState>()(
   devtools(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       connectingTool: null,
       connectingToolUrl: null,
       isConnectionDialogOpen: false,
+      isAccountSwitchDialogOpen: false,
+      accountSwitchTool: null,
+      accountSwitchLogoutUrl: null,
       disconnectingTool: null,
       isDisconnectDialogOpen: false,
       toolLoadingStates: {},
@@ -59,6 +72,36 @@ export const useToolStore = create<ToolState>()(
           connectingToolUrl: null,
           isConnectionDialogOpen: false,
         }),
+
+      // Account switch dialog actions
+      openAccountSwitchDialog: (tool, logoutUrl) =>
+        set({
+          accountSwitchTool: tool,
+          accountSwitchLogoutUrl: logoutUrl,
+          isAccountSwitchDialogOpen: true,
+        }),
+
+      closeAccountSwitchDialog: () =>
+        set({
+          accountSwitchTool: null,
+          accountSwitchLogoutUrl: null,
+          isAccountSwitchDialogOpen: false,
+        }),
+
+      proceedAfterAccountSwitch: () => {
+        const { accountSwitchTool } = get();
+        if (accountSwitchTool) {
+          // Close account switch dialog and open connection dialog
+          set({
+            isAccountSwitchDialogOpen: false,
+            accountSwitchLogoutUrl: null,
+            connectingTool: accountSwitchTool,
+            connectingToolUrl: null,
+            isConnectionDialogOpen: true,
+            accountSwitchTool: null,
+          });
+        }
+      },
 
       // Disconnect dialog actions
       openDisconnectDialog: (tool) =>

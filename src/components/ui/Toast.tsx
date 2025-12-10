@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Info, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useToastStore, type Toast as ToastType, type ToastType as ToastVariant } from '@/stores/useToastStore';
 
 const toastIcons: Record<ToastVariant, React.ReactNode> = {
@@ -8,6 +8,7 @@ const toastIcons: Record<ToastVariant, React.ReactNode> = {
   error: <AlertCircle className="h-5 w-5 text-red-500" />,
   info: <Info className="h-5 w-5 text-blue-500" />,
   warning: <AlertTriangle className="h-5 w-5 text-yellow-500" />,
+  reconnect: <RefreshCw className="h-5 w-5 text-orange-500" />,
 };
 
 const toastStyles: Record<ToastVariant, string> = {
@@ -15,6 +16,7 @@ const toastStyles: Record<ToastVariant, string> = {
   error: 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20',
   info: 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20',
   warning: 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20',
+  reconnect: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20',
 };
 
 interface ToastItemProps {
@@ -24,6 +26,13 @@ interface ToastItemProps {
 
 const ToastItem = React.forwardRef<HTMLDivElement, ToastItemProps>(
   ({ toast, onRemove }, ref) => {
+    const handleActionClick = () => {
+      if (toast.action?.onClick) {
+        toast.action.onClick();
+        onRemove(toast.id);
+      }
+    };
+
     return (
       <motion.div
         ref={ref}
@@ -43,6 +52,15 @@ const ToastItem = React.forwardRef<HTMLDivElement, ToastItemProps>(
           <p className="font-medium text-gray-900 dark:text-white">{toast.title}</p>
           {toast.message && (
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{toast.message}</p>
+          )}
+          {toast.action && (
+            <button
+              onClick={handleActionClick}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {toast.action.label}
+            </button>
           )}
         </div>
         <button
