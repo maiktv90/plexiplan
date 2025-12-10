@@ -220,8 +220,8 @@ const ConnectedToolsList: React.FC<{
         {Object.entries(toolsByProvider).map(([clientKey, accounts]) => {
           const toolDef = SUPPORTED_TOOLS.find((t) => t.clientRegistrationId === clientKey);
           if (!toolDef) return null;
-          // Show for OAuth2 and CUSTOM auth (Trello) - multi-account makes sense for them
-          if (toolDef.authMethod !== 'OAUTH2' && toolDef.authMethod !== 'CUSTOM') return null;
+          // Show for OAuth2, CUSTOM auth (Trello), and PAT - multi-account makes sense for them
+          if (toolDef.authMethod !== 'OAUTH2' && toolDef.authMethod !== 'CUSTOM' && toolDef.authMethod !== 'PAT') return null;
 
           // Get connectUrl from one of the connected accounts
           let connectUrl = accounts[0]?.connectUrl;

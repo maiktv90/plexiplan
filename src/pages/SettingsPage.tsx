@@ -26,6 +26,7 @@ import type { ToolDefinition, ConnectedTool, PATCredentials } from '@/types/tool
 import { jiraClientRegistrationId, jiraServerClientRegistrationId } from '@/config/jira.config';
 
 const BITBUCKET_CLIENT_REGISTRATION_ID = 'bitbucket';
+const BITBUCKET_PAT_CLIENT_REGISTRATION_ID = 'bitbucket-pat';
 
 export const SettingsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('tools');
@@ -129,16 +130,11 @@ export const SettingsPage: React.FC = () => {
   const handlePATConnect = async (tool: ToolDefinition, credentials: PATCredentials) => {
     setToolLoading(tool.clientRegistrationId, true);
     try {
-      // For Bitbucket App Password, combine username and token into "username:token" format
-      let token = credentials.token;
-      if (tool.clientRegistrationId === 'bitbucket-pat' && credentials.username) {
-        token = `${credentials.username}:${credentials.token}`;
-      }
-
       await registerPATMutation.mutateAsync({
         client: tool.clientRegistrationId,
-        token,
+        token: credentials.token,
         domain: credentials.domain,
+        email: credentials.email, // For Bitbucket API token authentication
       });
       closeConnectionDialog();
     } catch (err) {
@@ -154,7 +150,7 @@ export const SettingsPage: React.FC = () => {
   const handleConfirmDisconnect = async (clientKey: string, externalAccountId?: string) => {
     setToolLoading(clientKey, true);
     try {
-      await disconnectMutation.mutateAsync({ clientRegistrationId: clientKey, externalAccountId });
+      await disconnectMutation.mutateAsync({ clientRegistrationId: clientKey, externalAccountId: externalAccountId ?? '' });
       closeDisconnectDialog();
     } catch (err) {
       setToolError(
@@ -184,8 +180,9 @@ export const SettingsPage: React.FC = () => {
       }
       setIsJiraConfigOpen(true);
     }
-    // Check if it's Bitbucket
-    else if (tool.clientRegistrationId === BITBUCKET_CLIENT_REGISTRATION_ID) {
+    // Check if it's Bitbucket (OAuth or API Token)
+    else if (tool.clientRegistrationId === BITBUCKET_CLIENT_REGISTRATION_ID ||
+             tool.clientRegistrationId === BITBUCKET_PAT_CLIENT_REGISTRATION_ID) {
       // Fetch current configuration before opening dialog
       try {
         const result = await BitbucketService.getConfiguration();

@@ -31,7 +31,7 @@ export type ToolIcon = 'github' | 'bitbucket' | 'jira' | 'trello' | 'gitlab';
 export interface ConfigField {
   key: string;
   label: string;
-  type: 'text' | 'url' | 'password';
+  type: 'text' | 'url' | 'password' | 'email';
   required: boolean;
   placeholder?: string;
   helpText?: string;
@@ -92,6 +92,8 @@ export interface RegisterPATRequest {
   client: string;
   token: string;
   domain?: string;
+  /** Required for Bitbucket Cloud API token authentication (Atlassian account email) */
+  email?: string;
 }
 
 /**
@@ -122,6 +124,7 @@ export interface PATCredentials {
   token: string;
   domain?: string;
   username?: string; // For providers that require username:token format (e.g., Bitbucket App Password)
+  email?: string; // For Bitbucket Cloud API token authentication (Atlassian account email)
 }
 
 /**

@@ -37,6 +37,14 @@ export const SUPPORTED_TOOLS: ToolDefinition[] = [
     authMethod: 'PAT',
     configFields: [
       {
+        key: 'email',
+        label: 'Atlassian Account Email',
+        type: 'email',
+        required: true,
+        placeholder: 'your-email@example.com',
+        helpText: 'Your Atlassian account email (check bitbucket.org/account/settings)',
+      },
+      {
         key: 'token',
         label: 'API Token',
         type: 'password',
