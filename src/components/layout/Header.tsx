@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Layers, LayoutDashboard, Settings, Menu, LogOut, ExternalLink, Clock, FileText, X, ListTodo, GitPullRequest } from 'lucide-react';
-import { logout } from "@/api/auth.ts";
-import { baseuserUrl, keycloakClientRegistrationId } from "@/config/auth.config.ts";
+import { useLogoutMutation } from "@/api/hooks/useAuth";
 import { popupUrl } from "@/config/global.config.ts";
 import { useIntegrationsQuery } from '@/api/hooks/useTools';
 import { getToolsByCategory } from '@/config/tools.config';
@@ -16,6 +15,7 @@ const Header: React.FC<HeaderProps> = ({ isPopup }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const navRef = useRef<HTMLDivElement>(null);
+  const logoutMutation = useLogoutMutation();
 
   // Close nav when clicking outside
   useEffect(() => {
@@ -42,18 +42,27 @@ const Header: React.FC<HeaderProps> = ({ isPopup }) => {
   }, [showNav]);
 
 
-  const logoutCallback = async () => {
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
-      // In extension context, use chrome.tabs.create to avoid popup blockers
-      chrome.tabs.create({ url: popupUrl });
-    } else {
-      window.location.assign(popupUrl);
-    }
-  };
-
   const handleLogout = async () => {
-    await logout(keycloakClientRegistrationId, baseuserUrl, logoutCallback);
-    setShowNav(false);
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        setShowNav(false);
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+          // In extension context, use chrome.tabs.create to avoid popup blockers
+          chrome.tabs.create({ url: popupUrl });
+        } else {
+          window.location.assign(popupUrl);
+        }
+      },
+      onError: () => {
+        // Still navigate away even if logout API fails
+        setShowNav(false);
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+          chrome.tabs.create({ url: popupUrl });
+        } else {
+          window.location.assign(popupUrl);
+        }
+      }
+    });
   };
 
   // Check if we're in extension context
@@ -139,7 +148,7 @@ const Header: React.FC<HeaderProps> = ({ isPopup }) => {
       {showNav && (
         <div
           ref={navRef}
-          className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-transform duration-300 ease-in-out ${
+          className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-transform duration-300 ease-in-out flex flex-col ${
             showNav ? 'translate-x-0' : '-translate-x-full'
           } z-50`}
         >
@@ -160,7 +169,7 @@ const Header: React.FC<HeaderProps> = ({ isPopup }) => {
             </div>
           </div>
           
-          <nav className="flex-1 pt-4 pb-4">
+          <nav className="flex-1 flex flex-col pt-4 pb-4">
             <ul className="space-y-1 px-3">
               <li>
                 <button
