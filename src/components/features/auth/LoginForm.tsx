@@ -1,8 +1,8 @@
 // Clean Architecture - Login Form Feature Component
 import React, { useEffect, useState, useTransition } from 'react';
-import { useNavigate }                     from 'react-router-dom';
-import { useLoginMutation, isExtensionContext }                          from '@/api';
-import { useAuthStore } from '@/store';
+import { useNavigate } from 'react-router-dom';
+import { isExtensionContext } from '@/api';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -12,8 +12,7 @@ export const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [validationErrors, setValidationErrors] = useState<{ email?: string; password?: string }>({});
 
-  const { isAuthenticated, error } = useAuthStore();
-  const loginMutation = useLoginMutation();
+  const { isAuthenticated, error, login, isLoading } = useAuthStore();
   const [isPending, startTransition] = useTransition();
   const navigate = useNavigate();
 
@@ -38,13 +37,13 @@ export const LoginForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     try {
-      await loginMutation.mutateAsync({ email, password });
+      await login(email, password);
       startTransition(() => {
         if (isExtensionContext()) {
           window.location.hash = '#/';
@@ -53,14 +52,12 @@ export const LoginForm: React.FC = () => {
         }
       });
     } catch (error) {
-      // The error is already handled by the useLoginMutation's onError callback
+      console.error(error)
     }
   };
 
   useEffect(() => {
-    console.log({isAuthenticated})
-    if(isAuthenticated) {
-      console.log("is auth ", isAuthenticated)
+    if (isAuthenticated) {
       return navigate("/");
     }
   }, [isAuthenticated, navigate]);
@@ -104,11 +101,11 @@ export const LoginForm: React.FC = () => {
 
         <Button
           type="submit"
-          loading={loginMutation.isPending}
-          disabled={loginMutation.isPending || isPending}
+          loading={isLoading}
+          disabled={isLoading || isPending}
           className="w-full"
         >
-          {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
+          {isLoading ? 'Signing In...' : 'Sign In'}
         </Button>
 
         <div className="text-center">
@@ -116,7 +113,7 @@ export const LoginForm: React.FC = () => {
             Don't have an account?{' '}
             <a
               href="#/register"
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium"
+              className="text-primary-600 dark:text-primary-400 hover:text-primary-500 font-medium"
             >
               Sign up here
             </a>

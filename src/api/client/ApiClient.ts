@@ -1,11 +1,13 @@
 // Clean Architecture - Standardized API Client
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios';
-import { getCsrfToken } from '@/utils/auth.utils';
+import { getCsrfToken }                                                           from '@/utils/auth.utils';
 
 export interface ApiResponse<T = unknown> {
   data: T;
   success: boolean;
   error?: string;
+  code?: string;  // Error code from backend (e.g., 'RECONNECT_REQUIRED')
+  provider?: string;  // Provider that needs reconnection
   message?: string;
 }
 
@@ -19,9 +21,11 @@ export class ApiClient {
   private client: AxiosInstance;
 
   constructor(config: ApiConfig) {
+    
     this.client = axios.create({
       baseURL: config.baseURL,
       timeout: config.timeout || 10000,
+      withCredentials: true,  // Required for cookies to be sent/received
       headers: {
         'Content-Type': 'application/json',
         ...config.headers,
@@ -37,9 +41,10 @@ export class ApiClient {
       async (config) => {
         // Add JWT token if available
         const token = await this.getAuthToken();
-        console.log('ApiClient: Using token:', token ? `${token.substring(0, 20)}...` : 'null');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+        } else {
+          console.log('ApiClient: No token available for request');
         }
 
         // Add CSRF token for non-GET requests (except login endpoint)
@@ -67,11 +72,19 @@ export class ApiClient {
         return response;
       },
       (error) => {
+        // Log the error for debugging
+        console.error('API Error:', {
+          status: error.response?.status,
+          url: error.config?.url,
+          method: error.config?.method,
+          data: error.response?.data
+        });
+        
         // Handle common HTTP errors
         if (error.response?.status === 401) {
           this.handleUnauthorized();
         }
-        
+
         return Promise.reject(this.normalizeError(error));
       }
     );
@@ -79,6 +92,7 @@ export class ApiClient {
 
   private async getAuthToken(): Promise<string | null> {
     try {
+      // Use existing Keycloak token for all authenticated requests
       // Check if we're in extension context
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
         // Try new token storage first
@@ -96,14 +110,18 @@ export class ApiClient {
           try {
             const parsed = JSON.parse(tokens);
             if (parsed.accessToken) return parsed.accessToken;
-          } catch {
+          } catch (e) {
+            console.error('ApiClient: Error parsing auth_tokens:', e);
             // Suppress JSON parsing errors
           }
+        } else {
+          console.log('ApiClient: No auth_tokens in localStorage');
         }
         // Fall back to legacy storage
         return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
       }
-    } catch {
+    } catch (error) {
+      console.error('ApiClient: Error getting auth token:', error);
       return null;
     }
   }
@@ -118,7 +136,7 @@ export class ApiClient {
       localStorage.removeItem('auth_token');
       sessionStorage.removeItem('auth_token');
     }
-    
+
     // Don't redirect here - causes infinite loops
     // The AuthProvider will handle routing based on auth state
   }
@@ -126,11 +144,29 @@ export class ApiClient {
   private normalizeError(error: unknown): ApiResponse {
     if (axios.isAxiosError(error)) {
       if (error.response) {
+        const status = error.response.status;
+        const responseData = error.response.data;
+        let errorMessage = responseData?.message || error.response.statusText || 'An error occurred';
+
+        // Handle specific status codes
+        if (status === 404) {
+          errorMessage = `404: ${errorMessage}`;
+        } else if (status === 401) {
+          // Check if this is a token refresh failure that requires reconnection
+          if (responseData?.code === 'RECONNECT_REQUIRED') {
+            errorMessage = responseData.message || `Please reconnect your ${responseData.provider || 'account'}`;
+          } else {
+            errorMessage = 'Authentication required. Please log in again.';
+          }
+        }
+
         return {
           data: null,
           success: false,
-          error: error.response.data?.message || error.response.statusText || 'An error occurred',
-          message: error.response.data?.message,
+          error: errorMessage,
+          code: responseData?.code,
+          provider: responseData?.provider,
+          message: responseData?.message,
         };
       } else if (error.request) {
         return {
@@ -141,58 +177,95 @@ export class ApiClient {
       }
     }
     if (error instanceof Error) {
-        return {
-            data: null,
-            success: false,
-            error: error.message || 'An unexpected error occurred',
-        };
-    }
-    return {
+      return {
         data: null,
         success: false,
-        error: 'An unexpected error occurred',
+        error: error.message || 'An unexpected error occurred',
+      };
+    }
+    return {
+      data: null,
+      success: false,
+      error: 'An unexpected error occurred',
     };
   }
 
   // HTTP Methods
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.get<T>(url, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.get<T>(url, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      // If the interceptor already normalized the error, return it
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      // Otherwise normalize it
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.post<T>(url, data, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.post<T>(url, data, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.put<T>(url, data, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.put<T>(url, data, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.delete<T>(url, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.delete<T>(url, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   async patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    const response = await this.client.patch<T>(url, data, config);
-    return {
-      data: response.data,
-      success: true,
-    };
+    try {
+      const response = await this.client.patch<T>(url, data, config);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'success' in error) {
+        return error as ApiResponse<T>;
+      }
+      return this.normalizeError(error) as ApiResponse<T>;
+    }
   }
 
   // Raw axios instance for advanced use cases

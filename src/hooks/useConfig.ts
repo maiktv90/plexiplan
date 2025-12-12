@@ -1,10 +1,5 @@
-import { useContext } from 'react';
-import { ConfigContext } from '../context/configContextDef';
+import { useConfigStore } from '@/stores/useConfigStore';
 
 export const useConfig = () => {
-  const context = useContext(ConfigContext);
-  if (context === undefined) {
-    throw new Error('useConfig must be used within a ConfigProvider');
-  }
-  return context;
+  return useConfigStore();
 };

@@ -1,6 +1,6 @@
 // Clean Architecture - Auth Service Layer
-import { authApiClient } from '@/api';
-import type { IUser }    from '@/types';
+import { authApiClient } from '../client/instances';
+import type { IUser } from '@/types';
 
 export interface LoginCredentials {
   email: string;
@@ -82,23 +82,28 @@ export class AuthService {
   static async login(credentials: LoginCredentials) {
     const response = await authApiClient.post<AuthResponse>('/login', credentials);
 
+    console.log('AuthService.login response:', response);
     if (response.success && response.data.token) {
       // Store both access and refresh tokens
-      console.log("storing token ", )
+      console.log("storing token ", response.data.token.substring(0, 20) + '...');
       await storeTokens(response.data);
+      
+      // Verify token was stored
+      const storedToken = await AuthService.getAccessToken();
+      console.log('Verified stored token:', storedToken ? storedToken.substring(0, 20) + '...' : 'null');
     }
-    
+
     return response;
   }
 
   static async register(credentials: RegisterCredentials) {
     const response = await authApiClient.post<AuthResponse>('/register', credentials);
-    
+
     if (response.success && response.data.token) {
       // Store the tokens
       await storeTokens(response.data);
     }
-    
+
     return response;
   }
 
@@ -120,11 +125,11 @@ export class AuthService {
 
   static async refreshToken() {
     const response = await authApiClient.post<{ token: string }>('/refresh');
-    
+
     if (response.success && response.data.token) {
       await storeTokens(response.data);
     }
-    
+
     return response;
   }
 

@@ -6,8 +6,10 @@ export * from './client/instances';
 export * from './services/AuthService';
 export * from './services/TaskService';
 export * from './services/ConfigService';
+export * from './services/ToolService';
 
 // Hooks
 export * from './hooks/useAuth';
 export * from './hooks/useTasks';
 export * from './hooks/useConfig';
+export * from './hooks/useTools';

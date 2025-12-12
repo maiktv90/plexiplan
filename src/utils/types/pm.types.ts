@@ -17,3 +17,9 @@ interface Task {
 }
 
 export type { Task, TaskList };
+
+export interface TaskOverviewResponse {
+  taskLists: TaskList[];
+  hasConnectedTools: boolean;
+  needsToolConfiguration: boolean;
+}

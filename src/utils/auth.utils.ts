@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import { csrfTokenUrl, baseuserUrl } from '../config/auth.config';
+import { backendBaseUrl } from '../config/global.config';
 import type { User }                 from '@/types';
 
 // Helper function to check if we're running in extension context
@@ -41,7 +42,7 @@ export const checkAuthStatus = async (clientRegistrationId: string): Promise<Use
     if (isExtensionContext()) {
       try {
         const cookies = await chrome.cookies.getAll({
-          url: 'http://localhost:8080'
+          url: backendBaseUrl
         });
         
         // Add cookies to request headers
@@ -77,7 +78,7 @@ export const checkAuthStatus = async (clientRegistrationId: string): Promise<Use
     
     // If in extension context and not authenticated, provide login guidance
     if (isExtensionContext()) {
-      console.log('Extension auth tip: Please log in to the web app first at http://localhost:8080');
+      console.log(`Extension auth tip: Please log in to the web app first at ${backendBaseUrl}`);
     }
     
     return null;
@@ -89,7 +90,13 @@ export const getCsrfToken = async (): Promise<string | null> => {
   if (process.env.NODE_ENV === 'development') {
     return 'mock-csrf-token-12345';
   }
-  
+
+  // In extension context, skip CSRF token (using JWT Bearer auth instead)
+  // CSRF protection is for cookie-based auth, not needed with Bearer tokens
+  if (isExtensionContext()) {
+    return null;
+  }
+
   try {
     // Use direct axios call without interceptors to avoid circular dependency
     const response: AxiosResponse<CsrfTokenResponse> = await axios.get(csrfTokenUrl, {
@@ -100,7 +107,7 @@ export const getCsrfToken = async (): Promise<string | null> => {
     });
     return response.data.csrf;
   } catch (error) {
-    console.error('CSRF token fetch failed:', error);
+    console.error('CSRF token fetch failed:', error instanceof Error ? error.message : error);
     return null;
   }
 };

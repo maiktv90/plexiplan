@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/stores/useUIStore';
 
 export const useExtension = () => {
   const queryClient = useQueryClient();
@@ -13,11 +13,11 @@ export const useExtension = () => {
     const checkExtensionContext = () => {
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
         setIsExtension(true);
-        
+
         if (chrome.extension) {
           const popupViews = chrome.extension.getViews({ type: 'popup' });
           const tabViews = chrome.extension.getViews({ type: 'tab' });
-          
+
           setIsPopup(popupViews.length > 0 && tabViews.length < 0);
           setIsExpanded(tabViews.length > 0);
         }

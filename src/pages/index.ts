@@ -1,2 +1,11 @@
 // Clean Architecture - Page Exports
 export { LoginPage } from './LoginPage';
+export { RegisterPage } from './RegisterPage';
+export { TimeTrackingPage } from './TimeTrackingPage';
+export { BookingsPage } from './BookingsPage';
+export { BookingDetailPage } from './BookingDetailPage';
+export { CreateBookingPage } from './CreateBookingPage';
+export { SettingsPage } from './SettingsPage';
+export { TrelloCallbackPage } from './TrelloCallbackPage';
+export { TasksPage } from './TasksPage';
+export { RepositoriesPage } from './RepositoriesPage';

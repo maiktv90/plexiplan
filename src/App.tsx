@@ -1,12 +1,34 @@
 // Clean Architecture - Simplified App Component
 import { useEffect } from 'react';
 import { AppRouter } from '@/router/AppRouter';
-import { useUIStore } from '@/store';
-import { useAuthStore } from '@/store';
+import { useUIStore } from '@/stores/useUIStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useTimeTrackingSSE } from '@/hooks/useTimeTrackingSSE';
+import { ToastContainer } from '@/components/ui/Toast';
+import { TrelloCallbackPage } from '@/pages';
+
+// Check if current URL is Trello OAuth callback
+// Trello redirects to /auth/trello/callback#token=xxx
+const isTrelloCallback = window.location.pathname === '/auth/trello/callback';
 
 function App() {
   const { setIsPopup } = useUIStore();
-  const { isLoading } = useAuthStore();
+  const { isLoading, isAuthenticated } = useAuthStore();
+
+  // Connect to SSE for real-time time tracking updates (only when authenticated)
+  // Uses token in query param for auth since EventSource doesn't support headers
+  useTimeTrackingSSE({ enabled: isAuthenticated });
+
+  // Handle Trello OAuth callback - render callback page directly
+  // This bypasses the hash router since Trello uses fragment callback
+  if (isTrelloCallback) {
+    return (
+      <>
+        <TrelloCallbackPage />
+        <ToastContainer />
+      </>
+    );
+  }
 
   // Check if running in popup mode based on window size
   useEffect(() => {
@@ -18,7 +40,7 @@ function App() {
 
     checkIfPopup();
     window.addEventListener('resize', checkIfPopup);
-    
+
     return () => {
       window.removeEventListener('resize', checkIfPopup);
     };
@@ -33,7 +55,12 @@ function App() {
     );
   }
 
-  return <AppRouter />;
+  return (
+    <>
+      <AppRouter />
+      <ToastContainer />
+    </>
+  );
 }
 
 export default App;

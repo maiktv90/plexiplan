@@ -1,7 +1,7 @@
 // Clean Architecture - Auth Guard Feature Component
 import React, { type ReactNode, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuthStore } from '@/store';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { isExtensionContext } from '@/api';
 
 interface AuthGuardProps {
@@ -9,9 +9,9 @@ interface AuthGuardProps {
   redirectTo?: string;
 }
 
-export const AuthGuard: React.FC<AuthGuardProps> = ({ 
-  children, 
-  redirectTo = '/login' 
+export const AuthGuard: React.FC<AuthGuardProps> = ({
+  children,
+  redirectTo = '/login'
 }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
 
