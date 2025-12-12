@@ -6,7 +6,8 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci
+# Ensure no auth-related npmrc settings interfere
+RUN echo "always-auth=false" > .npmrc && npm ci
 
 # Copy source and build
 COPY . .
