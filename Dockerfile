@@ -6,8 +6,11 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-# Ensure no auth-related npmrc settings interfere
-RUN echo "always-auth=false" > .npmrc && npm ci
+# Clear any npm auth settings and use public registry only
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm config set always-auth false && \
+    npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true && \
+    npm ci
 
 # Copy source and build
 COPY . .
